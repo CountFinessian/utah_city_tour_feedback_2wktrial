@@ -1,0 +1,142 @@
+"use client";
+
+import { useState } from "react";
+import { Bot, Send, Sparkles } from "lucide-react";
+import { ConfidenceBadge } from "./CommandComponents";
+import { EvidencePopover, type EvidenceItem } from "./EvidencePopover";
+
+type AnalystResponse = {
+  answer: string;
+  confidence: "low" | "medium" | "high";
+  sampleSize: number;
+  evidence: EvidenceItem[];
+  suggestedActions: string[];
+};
+
+const prompts = [
+  "Why are tours not converting?",
+  "Summarize every objection about parking.",
+  "Which amenities matter most right now?",
+  "What should leadership focus on this week?",
+];
+
+export function AnalystConsole() {
+  const [question, setQuestion] = useState("");
+  const [messages, setMessages] = useState<{ question: string; response: AnalystResponse }[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function ask(nextQuestion = question) {
+    const trimmed = nextQuestion.trim();
+    if (!trimmed || busy) return;
+    setBusy(true);
+    setError(null);
+    setQuestion("");
+    try {
+      const res = await fetch("/api/analyst", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question: trimmed }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Analyst failed.");
+      setMessages((prev) => [{ question: trimmed, response: json as AnalystResponse }, ...prev]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Analyst failed.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
+      <section className="command-panel min-h-[560px]">
+        <div className="flex items-center gap-3 border-b border-command-border pb-4">
+          <span className="grid h-10 w-10 place-items-center rounded-[8px] bg-command-accent/15 text-command-accent">
+            <Bot className="h-5 w-5" />
+          </span>
+          <div>
+            <p className="command-label">AI Analyst</p>
+            <h2 className="text-lg font-semibold text-command-ink">Ask the operational corpus</h2>
+          </div>
+        </div>
+
+        <form
+          className="mt-5 flex gap-2"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void ask();
+          }}
+        >
+          <input
+            value={question}
+            onChange={(event) => setQuestion(event.target.value)}
+            placeholder="Ask why sentiment changed, what objections are rising, or what leadership should inspect..."
+            className="analyst-input"
+          />
+          <button type="submit" disabled={busy || !question.trim()} className="btn btn-primary px-4 disabled:opacity-50">
+            <Send className="h-4 w-4" />
+          </button>
+        </form>
+
+        {error && <p className="mt-3 rounded-[8px] border border-red-400/40 bg-red-500/10 px-3 py-2 text-sm text-red-200">{error}</p>}
+
+        <div className="mt-5 space-y-4">
+          {messages.length === 0 ? (
+            <div className="rounded-[8px] border border-command-border bg-white/[0.025] p-8 text-center">
+              <Sparkles className="mx-auto h-8 w-8 text-command-accent" />
+              <p className="mt-3 text-sm font-semibold text-command-ink">No analyst thread yet</p>
+              <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-command-muted">
+                Ask a leadership question. Answers are grounded in captured observations and carry evidence links.
+              </p>
+            </div>
+          ) : (
+            messages.map((message, index) => (
+              <article key={`${message.question}-${index}`} className="analyst-message">
+                <p className="text-sm font-semibold text-command-accent">Q: {message.question}</p>
+                <p className="mt-3 text-base leading-8 text-command-ink">{message.response.answer}</p>
+                <div className="mt-4 flex flex-wrap items-center gap-2">
+                  <ConfidenceBadge level={message.response.confidence} sampleSize={message.response.sampleSize} />
+                  <EvidencePopover count={message.response.evidence.length} items={message.response.evidence} />
+                </div>
+                <div className="mt-4 border-t border-command-border pt-4">
+                  <p className="command-label">Push to action</p>
+                  <ul className="mt-2 space-y-1 text-sm text-command-soft">
+                    {message.response.suggestedActions.map((action) => (
+                      <li key={action}>• {action}</li>
+                    ))}
+                  </ul>
+                </div>
+              </article>
+            ))
+          )}
+        </div>
+      </section>
+
+      <aside className="space-y-4">
+        <section className="command-panel">
+          <p className="command-label">Starter prompts</p>
+          <div className="mt-4 space-y-2">
+            {prompts.map((prompt) => (
+              <button
+                key={prompt}
+                type="button"
+                onClick={() => void ask(prompt)}
+                className="w-full rounded-[8px] border border-command-border bg-white/[0.025] px-3 py-3 text-left text-sm font-semibold text-command-soft hover:border-command-accent/50 hover:text-command-ink"
+              >
+                {prompt}
+              </button>
+            ))}
+          </div>
+        </section>
+
+        <section className="command-panel">
+          <p className="command-label">Compliance gate</p>
+          <p className="mt-3 text-sm leading-relaxed text-command-soft">
+            Analyst answers can summarize operational signals, objections, amenities, and journey friction. Segmentation and prediction remain gated by fair-housing review.
+          </p>
+        </section>
+      </aside>
+    </div>
+  );
+}
