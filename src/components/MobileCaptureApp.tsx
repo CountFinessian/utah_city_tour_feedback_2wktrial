@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowRight, Check, ChevronDown, Radio, ShieldCheck, LogOut, AlertCircle, User } from "lucide-react";
+import { ArrowRight, Check, ChevronDown, ShieldCheck, LogOut, AlertCircle, User } from "lucide-react";
 import { Recorder } from "./Recorder";
 import { amenityLabel, objectionLabel, type Observation } from "@/domain/observation";
 
@@ -148,7 +148,7 @@ export function MobileCaptureApp({ serverAsr = false }: { serverAsr?: boolean })
                 {currentUser.role}
               </span>
             </div>
-            <p className="text-sm font-semibold text-slate-200">{currentUser.name}</p>
+            <p className="text-sm font-semibold text-slate-200">{currentUser.name.trim().split(" ")[0]}</p>
             <p className="text-xs text-slate-400">{currentUser.email}</p>
           </div>
         )}
@@ -175,21 +175,13 @@ export function MobileCaptureApp({ serverAsr = false }: { serverAsr?: boolean })
 
       <section className="phone-frame" aria-label="Utah City mobile capture app">
         <div className="phone-hardware">
-          <div className="phone-statusbar">
-            <span>9:41</span>
-            <span className="flex items-center gap-1">
-              <Radio className="h-3.5 w-3.5" />
-              5G
-            </span>
-          </div>
-
           {unauthorizedWarning && (
             <div className="mx-4 mt-3 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs flex items-start gap-2.5 animate-in fade-in">
               <AlertCircle className="h-4 w-4 shrink-0 text-amber-400 mt-0.5" />
               <div>
                 <p className="font-bold text-amber-300">Leadership Access Required</p>
                 <p className="text-[11px] text-amber-200/90 mt-0.5">
-                  Your account ({currentUser?.name || "Host"}) has Host permissions for tour debriefs. Command intelligence is restricted to Leadership accounts.
+                  Your account ({currentUser?.name?.trim().split(" ")[0] || "Host"}) has Host permissions for tour debriefs. Command intelligence is restricted to Leadership accounts.
                 </p>
               </div>
             </div>
@@ -203,7 +195,7 @@ export function MobileCaptureApp({ serverAsr = false }: { serverAsr?: boolean })
             <div className="flex items-center gap-2">
               {currentUser && (
                 <span className="text-[11px] px-2.5 py-1 rounded-md bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 font-semibold flex items-center h-7">
-                  {currentUser.name}
+                  {currentUser.name.trim().split(" ")[0]}
                 </span>
               )}
               {currentUser?.role === "leader" && (

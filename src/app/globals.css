@@ -1312,7 +1312,7 @@ select {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0.7rem 1.25rem 0.9rem;
+    padding: 1.15rem 1.25rem 0.9rem;
   }
 
   .mobile-app-header h1 {
