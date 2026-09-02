@@ -19,6 +19,7 @@ export default async function SettingsPage() {
         </h1>
         <p className="mt-3 max-w-3xl text-sm leading-7 text-command-soft md:text-base">
           Invite tour hosts and leadership to the pilot, manage invitations, and control demo corpus data.
+          Invite tour hosts and leadership to the pilot, manage invitations, and view operational corpus status.
         </p>
       </header>
 
@@ -34,6 +35,8 @@ export default async function SettingsPage() {
       <section className="command-panel">
         <p className="command-label">Corpus management</p>
         <h2 className="mt-2 text-lg font-semibold text-command-ink">{liveCount} live · {demoCount} demo records</h2>
+        <p className="command-label">Corpus status</p>
+        <h2 className="mt-2 text-lg font-semibold text-command-ink">{observations.length} tour observation{observations.length === 1 ? "" : "s"} recorded</h2>
         <div className="command-admin-controls mt-5 rounded-[8px] border border-command-border bg-white/[0.035] p-4">
           <DigestActions hasData={hasData} />
         </div>

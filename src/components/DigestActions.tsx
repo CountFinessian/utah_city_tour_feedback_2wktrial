@@ -80,6 +80,7 @@ export function DigestActions({ hasData }: { hasData: boolean }) {
           className="btn px-3 py-2 disabled:opacity-50"
         >
           {busy === "refresh" ? "Refreshing..." : "Refresh"}
+          {busy === "refresh" ? "Refreshing..." : "Refresh view"}
         </button>
         {hasData && (
           <button
@@ -97,6 +98,7 @@ export function DigestActions({ hasData }: { hasData: boolean }) {
             className="btn btn-danger px-3 py-2 text-xs disabled:opacity-50"
           >
             {busy === "reset-all" ? "Resetting..." : "Reset all"}
+            {busy === "reset-all" ? "Resetting..." : "Reset corpus"}
           </button>
         )}
       </div>
