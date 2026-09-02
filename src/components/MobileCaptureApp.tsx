@@ -166,10 +166,9 @@ export function MobileCaptureApp({ serverAsr = false }: { serverAsr?: boolean })
           <button
             onClick={handleLogout}
             title="Sign out"
-            className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-red-400 px-2.5 py-1 rounded-md border border-white/10 hover:bg-white/5 transition-colors"
+            className="h-7 w-7 rounded-md flex items-center justify-center text-slate-400 hover:text-red-400 border border-white/10 hover:bg-white/5 transition-colors shrink-0"
           >
-            <LogOut className="h-3 w-3" />
-            <span>Sign out</span>
+            <LogOut className="h-3.5 w-3.5" />
           </button>
         </div>
       </div>
@@ -203,17 +202,16 @@ export function MobileCaptureApp({ serverAsr = false }: { serverAsr?: boolean })
             </div>
             <div className="flex items-center gap-2">
               {currentUser && (
-                <span className="text-[11px] px-2.5 py-1 rounded-md bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 font-semibold">
+                <span className="text-[11px] px-2.5 py-1 rounded-md bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 font-semibold flex items-center h-7">
                   {currentUser.name}
                 </span>
               )}
               <button
                 onClick={handleLogout}
                 title="Sign out of workspace"
-                className="flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-md bg-white/[0.04] hover:bg-red-500/15 text-slate-400 hover:text-red-300 border border-white/10 hover:border-red-500/25 transition-colors"
+                className="h-7 w-7 rounded-md flex items-center justify-center bg-white/[0.04] hover:bg-red-500/15 text-slate-400 hover:text-red-300 border border-white/10 hover:border-red-500/25 transition-colors shrink-0"
               >
-                <LogOut className="h-3 w-3" />
-                <span>Sign out</span>
+                <LogOut className="h-3.5 w-3.5" />
               </button>
             </div>
           </div>
