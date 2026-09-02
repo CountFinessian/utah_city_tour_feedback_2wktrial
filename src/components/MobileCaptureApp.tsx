@@ -208,9 +208,10 @@ export function MobileCaptureApp({ serverAsr = false }: { serverAsr?: boolean })
               )}
               <button
                 onClick={handleLogout}
-                className="flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-md bg-white/[0.06] hover:bg-red-500/15 text-slate-400 hover:text-red-300 border border-white/10 hover:border-red-500/25 transition-colors"
+                title="Sign out of workspace"
+                className="flex items-center gap-1 text-[9px] font-semibold px-1.5 py-0.5 rounded bg-white/[0.04] hover:bg-red-500/15 text-slate-400 hover:text-red-300 border border-white/10 hover:border-red-500/20 transition-colors"
               >
-                <LogOut className="h-3 w-3" />
+                <LogOut className="h-2.5 w-2.5" />
                 <span>Sign out</span>
               </button>
             </div>
