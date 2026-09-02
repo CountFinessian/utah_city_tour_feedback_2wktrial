@@ -206,6 +206,14 @@ export function MobileCaptureApp({ serverAsr = false }: { serverAsr?: boolean })
                   {currentUser.name}
                 </span>
               )}
+              {currentUser?.role === "leader" && (
+                <Link
+                  href="/settings"
+                  className="text-[11px] font-semibold px-2 py-1 rounded-md bg-white/[0.06] hover:bg-white/10 text-slate-300 border border-white/10 transition-colors flex items-center h-7"
+                >
+                  Settings
+                </Link>
+              )}
               <button
                 onClick={handleLogout}
                 title="Sign out of workspace"

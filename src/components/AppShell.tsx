@@ -13,6 +13,7 @@ const nav = [
   { href: "/signals", label: "Signals", shortLabel: "Signals", mark: "S", helper: "Themes & deltas" },
   { href: "/evidence", label: "Evidence", shortLabel: "Evidence", mark: "E", helper: "Source corpus" },
   { href: "/operations", label: "Operations", shortLabel: "Ops", mark: "O", helper: "Adoption quality" },
+  { href: "/settings", label: "Settings", shortLabel: "Settings", mark: "⚙", helper: "Team & Admin" },
 ];
 
 function isActive(pathname: string, href: string): boolean {
