@@ -187,8 +187,18 @@ export function InviteManager() {
                     </span>
                   </div>
                   <div className="flex items-center gap-2 text-[11px]">
-                    <span className={inv.claimed ? "text-emerald-400 font-medium" : "text-amber-400 font-medium"}>
-                      {inv.claimed ? "? Claimed & Active" : "? Pending Setup"}
+                    <span className={inv.claimed ? "text-emerald-400 font-medium flex items-center gap-1" : "text-amber-400 font-medium flex items-center gap-1"}>
+                      {inv.claimed ? (
+                        <>
+                          <Check className="h-3.5 w-3.5" />
+                          <span>Claimed & Active</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>⏳</span>
+                          <span>Pending Setup</span>
+                        </>
+                      )}
                     </span>
                   </div>
                 </div>

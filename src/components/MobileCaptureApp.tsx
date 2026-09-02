@@ -86,6 +86,10 @@ export function MobileCaptureApp({ serverAsr = false }: { serverAsr?: boolean })
   }
 
   async function submit(nextTranscript: string, id?: string) {
+    if (!nextTranscript.trim()) {
+      setError("Please add survey data to continue.");
+      return;
+    }
     setSubmitting(true);
     setProcessingIndex(0);
     setError(null);
@@ -242,6 +246,8 @@ export function MobileCaptureApp({ serverAsr = false }: { serverAsr?: boolean })
                 onProspectTag={setProspectTag}
                 onContextOpen={() => setContextOpen((value) => !value)}
                 onSubmit={() => void submit(transcript.trim())}
+                error={error}
+                onErrorClear={() => setError(null)}
               />
             ) : (
               <ReviewScreen
@@ -299,6 +305,8 @@ function CaptureScreen({
   processingIndex,
   canSubmit,
   serverAsr,
+  error,
+  onErrorClear,
   onText,
   onTranscript,
   onHostName,
@@ -316,6 +324,8 @@ function CaptureScreen({
   processingIndex: number;
   canSubmit: boolean;
   serverAsr: boolean;
+  error?: string | null;
+  onErrorClear?: () => void;
   onText: (value: string) => void;
   onTranscript: (value: string) => void;
   onHostName: (value: string) => void;
@@ -338,11 +348,20 @@ function CaptureScreen({
         <textarea
           id="mobile-transcript"
           value={transcript}
-          onChange={(event) => onTranscript(event.target.value)}
+          onChange={(event) => {
+            onTranscript(event.target.value);
+            if (error) onErrorClear?.();
+          }}
           placeholder="Toured a couple with a dog. They loved the pool but parking was a concern..."
-          className="mobile-textarea mt-3"
+          className={`mobile-textarea mt-3 ${error ? "border-rose-500/60 ring-1 ring-rose-500/50" : ""}`}
           rows={6}
         />
+        {error && (
+          <p className="mt-2 text-xs font-semibold text-rose-400 flex items-center gap-1.5 animate-in fade-in">
+            <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+            {error}
+          </p>
+        )}
       </section>
 
       <section className="mobile-card">
@@ -378,7 +397,7 @@ function CaptureScreen({
           </p>
           <p className="text-[11px] text-mobile-muted">No forms required after capture.</p>
         </div>
-        <button type="button" disabled={!canSubmit} onClick={onSubmit} className="mobile-primary-button">
+        <button type="button" disabled={submitting} onClick={onSubmit} className="mobile-primary-button">
           Structure debrief
           <ArrowRight className="h-4 w-4" />
         </button>
