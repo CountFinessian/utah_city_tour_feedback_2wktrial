@@ -100,9 +100,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <button
               onClick={handleLogout}
               title="Sign out"
-              className="p-1.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-white/10 transition-colors shrink-0"
+              style={{ padding: "4px" }}
+              className="rounded-md text-slate-400 hover:text-red-400 hover:bg-white/10 transition-colors shrink-0"
             >
-              <LogOut className="h-4 w-4" />
+              <LogOut style={{ width: "12px", height: "12px" }} />
             </button>
           </div>
         </div>
@@ -124,9 +125,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <button
                 onClick={handleLogout}
                 title="Sign out"
-                className="p-2 rounded-lg text-slate-600 hover:text-red-600 transition-colors"
+                style={{ padding: "4px" }}
+                className="rounded-md text-slate-600 hover:text-red-600 transition-colors"
               >
-                <LogOut className="h-4 w-4" />
+                <LogOut style={{ width: "13px", height: "13px" }} />
               </button>
             </div>
           </div>
@@ -162,9 +164,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <CommandPalette />
               <button
                 onClick={handleLogout}
-                className="flex items-center gap-1.5 text-xs font-medium text-slate-400 hover:text-red-400 transition-colors py-1.5 px-2.5 rounded-lg hover:bg-white/5"
+                title="Sign out"
+                style={{ fontSize: "11px", padding: "3px 8px" }}
+                className="flex items-center gap-1 font-medium text-slate-400 hover:text-red-400 transition-colors rounded-md hover:bg-white/5 border border-white/10"
               >
-                <LogOut className="h-3.5 w-3.5" />
+                <LogOut style={{ width: "12px", height: "12px" }} />
                 <span>Sign out</span>
               </button>
             </div>
