@@ -208,10 +208,10 @@ export function MobileCaptureApp({ serverAsr = false }: { serverAsr?: boolean })
               )}
               <button
                 onClick={handleLogout}
-                className="flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-300 border border-red-500/30 transition-colors"
+                className="flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-md bg-white/[0.06] hover:bg-red-500/15 text-slate-400 hover:text-red-300 border border-white/10 hover:border-red-500/25 transition-colors"
               >
-                <LogOut className="h-3.5 w-3.5" />
-                <span>Sign Out</span>
+                <LogOut className="h-3 w-3" />
+                <span>Sign out</span>
               </button>
             </div>
           </div>
