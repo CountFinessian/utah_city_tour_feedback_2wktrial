@@ -65,15 +65,19 @@ function LoginForm() {
           </div>
         )}
 
-        {/* Credentials Form */}
         <form
           onSubmit={handleLogin}
+          suppressHydrationWarning
           className="p-6 rounded-2xl bg-[#101827] border border-[#26354c] space-y-4 shadow-xl"
         >
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-[#b8c5d6]">Email address</label>
             <input
               type="email"
+              name="email"
+              id="email"
+              autoComplete="email"
+              suppressHydrationWarning
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -86,6 +90,10 @@ function LoginForm() {
             <label className="text-xs font-medium text-[#b8c5d6]">Password</label>
             <input
               type="password"
+              name="password"
+              id="password"
+              autoComplete="current-password"
+              suppressHydrationWarning
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}

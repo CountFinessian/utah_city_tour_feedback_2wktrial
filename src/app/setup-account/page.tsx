@@ -166,11 +166,15 @@ function SetupAccountForm() {
         )}
 
         {/* Password Setup Form */}
-        <form onSubmit={handleSubmit} className="p-6 rounded-2xl bg-[#101827] border border-[#26354c] space-y-4 shadow-xl">
+        <form onSubmit={handleSubmit} suppressHydrationWarning className="p-6 rounded-2xl bg-[#101827] border border-[#26354c] space-y-4 shadow-xl">
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-[#b8c5d6]">Your Full Name</label>
             <input
               type="text"
+              name="name"
+              id="name"
+              autoComplete="name"
+              suppressHydrationWarning
               required
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -183,6 +187,10 @@ function SetupAccountForm() {
             <label className="text-xs font-medium text-[#b8c5d6]">Create Password</label>
             <input
               type="password"
+              name="password"
+              id="password"
+              autoComplete="new-password"
+              suppressHydrationWarning
               required
               minLength={6}
               value={password}
@@ -196,6 +204,10 @@ function SetupAccountForm() {
             <label className="text-xs font-medium text-[#b8c5d6]">Confirm Password</label>
             <input
               type="password"
+              name="confirmPassword"
+              id="confirmPassword"
+              autoComplete="new-password"
+              suppressHydrationWarning
               required
               minLength={6}
               value={confirmPassword}
