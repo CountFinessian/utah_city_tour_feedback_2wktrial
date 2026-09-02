@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { findUserByEmail, verifyUserCredentials } from "@/server/auth/users";
+import { verifyUserCredentials } from "@/server/auth/users";
 import { SESSION_COOKIE_NAME, SESSION_MAX_AGE_SECONDS, signSessionToken } from "@/server/auth/session";
 
 export const dynamic = "force-dynamic";
@@ -7,21 +7,23 @@ export const dynamic = "force-dynamic";
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { email, password, persona } = body;
+    const { email, password } = body;
 
-    let user = null;
-
-    if (persona === "host") {
-      user = findUserByEmail("aiden@utahcity.com");
-    } else if (persona === "leader") {
-      user = findUserByEmail("nate@utahcity.com");
-    } else if (email && password) {
-      user = verifyUserCredentials(email, password);
+    if (!email || !password) {
+      return NextResponse.json(
+        { error: "Email and password are required." },
+        { status: 400 }
+      );
     }
+
+    const user = await verifyUserCredentials(email, password);
 
     if (!user) {
       return NextResponse.json(
-        { error: "Invalid email or password. Use aiden@utahcity.com or nate@utahcity.com." },
+        {
+          error:
+            "Invalid email or password. If you have an invitation, please activate your account using your setup link.",
+        },
         { status: 401 }
       );
     }
@@ -48,6 +50,6 @@ export async function POST(req: Request) {
     return response;
   } catch (error) {
     console.error("[login error]", error);
-    return NextResponse.json({ error: "Authentication failed" }, { status: 500 });
+    return NextResponse.json({ error: "Authentication failed. Please try again." }, { status: 500 });
   }
 }

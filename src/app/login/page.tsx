@@ -2,7 +2,7 @@
 
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowRight, Lock, ShieldCheck, UserCheck, AlertCircle } from "lucide-react";
+import { Lock, AlertCircle, Shield } from "lucide-react";
 
 function LoginForm() {
   const router = useRouter();
@@ -14,19 +14,20 @@ function LoginForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function handleLogin(payload: { email?: string; password?: string; persona?: "host" | "leader" }) {
+  async function handleLogin(e: React.FormEvent) {
+    e.preventDefault();
     setLoading(true);
     setError(null);
     try {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ email: email.trim(), password }),
       });
 
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error || "Authentication failed.");
+        setError(data.error || "Invalid email or password.");
         setLoading(false);
         return;
       }
@@ -43,7 +44,7 @@ function LoginForm() {
 
   return (
     <div className="min-h-screen bg-[#070b12] text-[#e8eef7] flex flex-col justify-center items-center px-4 py-12 selection:bg-[#43d9c7] selection:text-[#070b12]">
-      <div className="w-full max-w-md space-y-8">
+      <div className="w-full max-w-md space-y-7">
         {/* Brand Header */}
         <div className="text-center space-y-3">
           <div className="inline-flex items-center justify-center h-14 w-14 rounded-2xl bg-gradient-to-br from-[#0b7a75] to-[#43d9c7] shadow-lg shadow-[#0b7a75]/20 font-black text-2xl text-[#070b12] tracking-wider mb-2">
@@ -53,87 +54,22 @@ function LoginForm() {
             Utah City Host Intelligence
           </h1>
           <p className="text-sm text-[#8292a8]">
-            Sign in to access your role-specific workspace
+            Sign in with your verified credentials
           </p>
         </div>
 
         {error && (
-          <div className="flex items-center gap-3 p-3.5 rounded-xl bg-red-950/50 border border-red-800/60 text-red-200 text-sm animate-in fade-in">
-            <AlertCircle className="h-4 w-4 shrink-0 text-red-400" />
+          <div className="flex items-start gap-3 p-3.5 rounded-xl bg-red-950/50 border border-red-800/60 text-red-200 text-sm animate-in fade-in">
+            <AlertCircle className="h-4 w-4 shrink-0 text-red-400 mt-0.5" />
             <span>{error}</span>
           </div>
         )}
 
-        {/* 1-Tap Demo Quick-Switch */}
-        <div className="p-5 rounded-2xl bg-[#101827] border border-[#26354c] space-y-3.5 shadow-xl">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-[0.14em] text-[#8292a8]">
-              Demo Quick-Switch
-            </span>
-            <span className="text-[11px] px-2 py-0.5 rounded-full bg-[#43d9c7]/10 text-[#43d9c7] font-semibold border border-[#43d9c7]/20">
-              1-Tap Login
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 gap-2.5">
-            <button
-              type="button"
-              disabled={loading}
-              onClick={() => handleLogin({ persona: "host" })}
-              className="flex items-center justify-between p-3.5 rounded-xl bg-[#131e30] border border-[#26354c] hover:border-[#43d9c7]/60 hover:bg-[#18273f] transition-all text-left group disabled:opacity-50"
-            >
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="h-9 w-9 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-sm shrink-0">
-                  <UserCheck className="h-4 w-4" />
-                </div>
-                <div className="truncate">
-                  <div className="text-sm font-semibold text-[#f0f6ff] group-hover:text-[#43d9c7] transition-colors">
-                    Aiden (Tour Host)
-                  </div>
-                  <div className="text-xs text-[#8292a8]">
-                    aiden@utahcity.com · Mobile capture
-                  </div>
-                </div>
-              </div>
-              <ArrowRight className="h-4 w-4 text-[#8292a8] group-hover:text-[#43d9c7] group-hover:translate-x-0.5 transition-all shrink-0" />
-            </button>
-
-            <button
-              type="button"
-              disabled={loading}
-              onClick={() => handleLogin({ persona: "leader" })}
-              className="flex items-center justify-between p-3.5 rounded-xl bg-[#131e30] border border-[#26354c] hover:border-[#43d9c7]/60 hover:bg-[#18273f] transition-all text-left group disabled:opacity-50"
-            >
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="h-9 w-9 rounded-lg bg-sky-500/10 border border-sky-500/20 text-sky-400 flex items-center justify-center font-bold text-sm shrink-0">
-                  <ShieldCheck className="h-4 w-4" />
-                </div>
-                <div className="truncate">
-                  <div className="text-sm font-semibold text-[#f0f6ff] group-hover:text-[#43d9c7] transition-colors">
-                    Nate (Leadership)
-                  </div>
-                  <div className="text-xs text-[#8292a8]">
-                    nate@utahcity.com · Command & Analyst
-                  </div>
-                </div>
-              </div>
-              <ArrowRight className="h-4 w-4 text-[#8292a8] group-hover:text-[#43d9c7] group-hover:translate-x-0.5 transition-all shrink-0" />
-            </button>
-          </div>
-        </div>
-
-        {/* Traditional Credentials Form */}
+        {/* Credentials Form */}
         <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            handleLogin({ email, password });
-          }}
-          className="p-5 rounded-2xl bg-[#101827] border border-[#26354c] space-y-4 shadow-xl"
+          onSubmit={handleLogin}
+          className="p-6 rounded-2xl bg-[#101827] border border-[#26354c] space-y-4 shadow-xl"
         >
-          <div className="text-xs font-bold uppercase tracking-[0.14em] text-[#8292a8]">
-            Or Sign In With Password
-          </div>
-
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-[#b8c5d6]">Email address</label>
             <input
@@ -161,12 +97,20 @@ function LoginForm() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-[#43d9c7] text-[#070b12] font-bold text-sm hover:bg-[#38c4b3] transition-colors shadow-lg shadow-[#43d9c7]/20 disabled:opacity-50 mt-2"
+            className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-[#43d9c7] text-[#070b12] font-bold text-sm hover:bg-[#38c4b3] transition-colors shadow-lg shadow-[#43d9c7]/20 disabled:opacity-50 mt-4"
           >
             <Lock className="h-4 w-4" />
             <span>{loading ? "Authenticating..." : "Sign in to workspace"}</span>
           </button>
         </form>
+
+        {/* Access Notice */}
+        <div className="p-4 rounded-xl bg-[#101827]/60 border border-[#26354c]/60 flex items-start gap-3 text-xs text-[#8292a8]">
+          <Shield className="h-4 w-4 shrink-0 text-[#43d9c7] mt-0.5" />
+          <p className="leading-relaxed">
+            Access is restricted to authorized Utah City hosts and leaders. If you have received an invitation on your device, please open your setup link to create your account credentials.
+          </p>
+        </div>
 
         <p className="text-center text-xs text-[#65758b]">
           Utah City Host Intelligence Platform · Two-Week Internal Pilot

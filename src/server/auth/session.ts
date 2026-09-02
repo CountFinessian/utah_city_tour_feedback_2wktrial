@@ -8,7 +8,7 @@ export type SessionPayload = {
   email: string;
   name: string;
   role: UserRole;
-  title: string;
+  title?: string;
   exp: number; // unix timestamp in seconds
 };
 

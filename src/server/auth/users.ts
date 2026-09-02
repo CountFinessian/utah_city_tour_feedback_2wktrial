@@ -1,50 +1,44 @@
-export type UserRole = "host" | "leader";
+import {
+  findUserByEmail as dbFindUser,
+  type UserRole,
+  type StoredUser,
+} from "@/server/repositories/user-repository";
+import { verifyPassword } from "./crypto";
+
+export type { UserRole };
 
 export type AuthUser = {
   id: string;
   email: string;
   name: string;
   role: UserRole;
-  title: string;
+  title?: string;
 };
 
-type StoredUser = AuthUser & {
-  passwordHash: string;
-};
-
-// In-memory predefined pilot accounts. Passwords can also be matched plain for pilot accounts.
-export const PILOT_USERS: StoredUser[] = [
-  {
-    id: "usr_host_aiden",
-    email: "aiden@utahcity.com",
-    name: "Aiden",
-    role: "host",
-    title: "Tour Host",
-    passwordHash: "host2026!",
-  },
-  {
-    id: "usr_leader_nate",
-    email: "nate@utahcity.com",
-    name: "Nate",
-    role: "leader",
-    title: "Utah City Leadership",
-    passwordHash: "leader2026!",
-  },
-];
-
-export function findUserByEmail(email: string): AuthUser | null {
-  const normalized = email.trim().toLowerCase();
-  const user = PILOT_USERS.find((u) => u.email.toLowerCase() === normalized);
+export async function findUserByEmail(email: string): Promise<AuthUser | null> {
+  const user = await dbFindUser(email);
   if (!user) return null;
-  const { passwordHash: _, ...safeUser } = user;
-  return safeUser;
+  return {
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    role: user.role,
+    title: user.title,
+  };
 }
 
-export function verifyUserCredentials(email: string, password: string): AuthUser | null {
-  const normalized = email.trim().toLowerCase();
-  const user = PILOT_USERS.find((u) => u.email.toLowerCase() === normalized);
+export async function verifyUserCredentials(email: string, password: string): Promise<AuthUser | null> {
+  const user = await dbFindUser(email);
   if (!user) return null;
-  if (user.passwordHash !== password) return null;
-  const { passwordHash: _, ...safeUser } = user;
-  return safeUser;
+
+  const valid = await verifyPassword(password, user.passwordHash, user.passwordSalt);
+  if (!valid) return null;
+
+  return {
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    role: user.role,
+    title: user.title,
+  };
 }
