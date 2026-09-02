@@ -165,9 +165,10 @@ export function MobileCaptureApp({ serverAsr = false }: { serverAsr?: boolean })
           )}
           <button
             onClick={handleLogout}
-            className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-red-400 py-2 px-3 rounded-lg border border-white/10 hover:bg-white/5 transition-colors"
+            title="Sign out"
+            className="flex items-center gap-1 text-[10px] font-medium text-slate-400 hover:text-red-400 py-1 px-2 rounded-md border border-white/10 hover:bg-white/5 transition-colors"
           >
-            <LogOut className="h-3.5 w-3.5" />
+            <LogOut className="h-2.5 w-2.5" />
             <span>Sign out</span>
           </button>
         </div>
