@@ -166,10 +166,9 @@ export function MobileCaptureApp({ serverAsr = false }: { serverAsr?: boolean })
           <button
             onClick={handleLogout}
             title="Sign out"
-            style={{ fontSize: "10px", padding: "2px 6px", height: "auto", minHeight: "unset" }}
-            className="flex items-center gap-1 font-medium text-slate-400 hover:text-red-400 rounded-md border border-white/10 hover:bg-white/5 transition-colors"
+            className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-red-400 px-2.5 py-1 rounded-md border border-white/10 hover:bg-white/5 transition-colors"
           >
-            <LogOut style={{ width: "10px", height: "10px" }} />
+            <LogOut className="h-3 w-3" />
             <span>Sign out</span>
           </button>
         </div>
@@ -211,10 +210,9 @@ export function MobileCaptureApp({ serverAsr = false }: { serverAsr?: boolean })
               <button
                 onClick={handleLogout}
                 title="Sign out of workspace"
-                style={{ fontSize: "9px", padding: "2px 5px", height: "auto", minHeight: "unset", lineHeight: "1" }}
-                className="flex items-center gap-1 font-semibold rounded bg-white/[0.04] hover:bg-red-500/15 text-slate-400 hover:text-red-300 border border-white/10 hover:border-red-500/20 transition-colors"
+                className="flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-md bg-white/[0.04] hover:bg-red-500/15 text-slate-400 hover:text-red-300 border border-white/10 hover:border-red-500/25 transition-colors"
               >
-                <LogOut style={{ width: "10px", height: "10px" }} />
+                <LogOut className="h-3 w-3" />
                 <span>Sign out</span>
               </button>
             </div>

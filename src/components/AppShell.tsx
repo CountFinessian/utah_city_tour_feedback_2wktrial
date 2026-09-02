@@ -100,10 +100,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <button
               onClick={handleLogout}
               title="Sign out"
-              style={{ padding: "4px" }}
-              className="rounded-md text-slate-400 hover:text-red-400 hover:bg-white/10 transition-colors shrink-0"
+              className="h-8 w-8 rounded-lg flex items-center justify-center p-0 border border-white/10 hover:border-red-500/30 text-slate-400 hover:text-red-400 hover:bg-white/5 transition-colors shrink-0"
             >
-              <LogOut style={{ width: "12px", height: "12px" }} />
+              <LogOut className="h-4 w-4" />
             </button>
           </div>
         </div>
@@ -125,10 +124,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <button
                 onClick={handleLogout}
                 title="Sign out"
-                style={{ padding: "4px" }}
-                className="rounded-md text-slate-600 hover:text-red-600 transition-colors"
+                className="h-8 w-8 rounded-lg flex items-center justify-center p-0 border border-border hover:border-red-500/30 text-slate-600 hover:text-red-600 transition-colors"
               >
-                <LogOut style={{ width: "13px", height: "13px" }} />
+                <LogOut className="h-4 w-4" />
               </button>
             </div>
           </div>
@@ -165,10 +163,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <button
                 onClick={handleLogout}
                 title="Sign out"
-                style={{ fontSize: "11px", padding: "3px 8px" }}
-                className="flex items-center gap-1 font-medium text-slate-400 hover:text-red-400 transition-colors rounded-md hover:bg-white/5 border border-white/10"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-red-400 hover:bg-white/5 border border-white/10 transition-colors"
               >
-                <LogOut style={{ width: "12px", height: "12px" }} />
+                <LogOut className="h-3.5 w-3.5" />
                 <span>Sign out</span>
               </button>
             </div>
