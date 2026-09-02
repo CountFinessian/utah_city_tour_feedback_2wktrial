@@ -1,13 +1,17 @@
 import { anthropic } from "@ai-sdk/anthropic";
-import { google } from "@ai-sdk/google";
-import type { LanguageModel } from "ai";
+import { createGoogleGenerativeAI } from "@ai-sdk/google";
 
-const GOOGLE_MODEL = process.env.GOOGLE_MODEL ?? "gemini-2.5-pro";
+const GOOGLE_MODEL = process.env.GOOGLE_MODEL ?? "gemini-3.6-flash";
 const ANTHROPIC_MODEL = process.env.ANTHROPIC_MODEL ?? "claude-sonnet-4-6";
 const GATEWAY_MODEL = process.env.EXTRACTION_MODEL ?? "anthropic/claude-sonnet-4-6";
 
+function getGoogle() {
+  const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+  return createGoogleGenerativeAI({ apiKey });
+}
+
 export function hasGoogleKey(): boolean {
-  return Boolean(process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GEMINI_API_KEY);
+  return Boolean(process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY);
 }
 
 export function hasAnthropicKey(): boolean {
@@ -24,7 +28,10 @@ export function hasLLM(): boolean {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function llmModel(): any {
-  if (hasGoogleKey()) return google(GOOGLE_MODEL);
+  if (hasGoogleKey()) {
+    const google = getGoogle();
+    return google(GOOGLE_MODEL);
+  }
   if (hasAnthropicKey()) return anthropic(ANTHROPIC_MODEL);
   return GATEWAY_MODEL;
 }
