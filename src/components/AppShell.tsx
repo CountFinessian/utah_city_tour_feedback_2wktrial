@@ -1,7 +1,9 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { LogOut, User } from "lucide-react";
 import { CommandPalette } from "@/components/domain/CommandPalette";
 
 const nav = [
@@ -20,6 +22,23 @@ function isActive(pathname: string, href: string): boolean {
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const [user, setUser] = useState<{ name: string; role: string; email: string } | null>(null);
+
+  useEffect(() => {
+    fetch("/api/auth/me")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.user) setUser(data.user);
+      })
+      .catch(() => {});
+  }, []);
+
+  async function handleLogout() {
+    await fetch("/api/auth/logout", { method: "POST" });
+    router.push("/login");
+    router.refresh();
+  }
 
   return (
     <div className="app-shell lg:grid lg:grid-cols-[292px_1fr]">
@@ -65,6 +84,28 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </p>
           </div>
         </div>
+
+        <div className="mt-8 border-t border-white/10 pt-5">
+          <p className="nav-section">Session</p>
+          <div className="mt-3 flex items-center justify-between gap-3 rounded-xl bg-white/[0.04] p-3 border border-white/10">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="h-8 w-8 rounded-lg bg-[#43d9c7]/10 border border-[#43d9c7]/20 text-[#43d9c7] flex items-center justify-center font-bold text-xs shrink-0">
+                {user ? user.name.charAt(0) : "U"}
+              </div>
+              <div className="min-w-0 truncate">
+                <p className="text-xs font-bold text-slate-200 truncate">{user ? user.name : "Active User"}</p>
+                <p className="text-[10px] text-[#43d9c7] font-medium capitalize truncate">{user ? `${user.role} workspace` : "Authenticated"}</p>
+              </div>
+            </div>
+            <button
+              onClick={handleLogout}
+              title="Sign out"
+              className="p-1.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-white/10 transition-colors shrink-0"
+            >
+              <LogOut className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
       </aside>
 
       <div className="min-w-0">
@@ -76,9 +117,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </span>
               <span>Utah City</span>
             </Link>
-            <Link href="/" className="btn btn-primary px-3 py-2 text-xs">
-              Capture
-            </Link>
+            <div className="flex items-center gap-2">
+              <Link href="/" className="btn btn-primary px-3 py-2 text-xs">
+                Capture
+              </Link>
+              <button
+                onClick={handleLogout}
+                title="Sign out"
+                className="p-2 rounded-lg text-slate-600 hover:text-red-600 transition-colors"
+              >
+                <LogOut className="h-4 w-4" />
+              </button>
+            </div>
           </div>
           <nav className="flex gap-1 overflow-x-auto px-3 pb-3 text-sm">
             {nav.map((item) => {
@@ -101,7 +151,23 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-command-muted">
               Leadership Intelligence
             </p>
-            <CommandPalette />
+            <div className="flex items-center gap-4">
+              {user && (
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/[0.04] border border-white/10 text-xs">
+                  <span className="h-2 w-2 rounded-full bg-[#43d9c7]" />
+                  <span className="font-semibold text-slate-200">{user.name}</span>
+                  <span className="text-[10px] text-slate-400 capitalize">({user.role})</span>
+                </div>
+              )}
+              <CommandPalette />
+              <button
+                onClick={handleLogout}
+                className="flex items-center gap-1.5 text-xs font-medium text-slate-400 hover:text-red-400 transition-colors py-1.5 px-2.5 rounded-lg hover:bg-white/5"
+              >
+                <LogOut className="h-3.5 w-3.5" />
+                <span>Sign out</span>
+              </button>
+            </div>
           </div>
         </div>
 

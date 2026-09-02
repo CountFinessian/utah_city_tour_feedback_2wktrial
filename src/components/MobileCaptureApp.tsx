@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowRight, Check, ChevronDown, Radio, ShieldCheck } from "lucide-react";
+import { ArrowRight, Check, ChevronDown, Radio, ShieldCheck, LogOut, AlertCircle, User } from "lucide-react";
 import { Recorder } from "./Recorder";
 import { amenityLabel, objectionLabel, type Observation } from "@/domain/observation";
 
@@ -26,6 +27,10 @@ function coverageLabel(score: number): string {
 }
 
 export function MobileCaptureApp({ serverAsr = false }: { serverAsr?: boolean }) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [currentUser, setCurrentUser] = useState<{ name: string; role: string; email: string } | null>(null);
+
   const [hostName, setHostName] = useState("");
   const [floorPlan, setFloorPlan] = useState("");
   const [prospectTag, setProspectTag] = useState("");
@@ -37,6 +42,26 @@ export function MobileCaptureApp({ serverAsr = false }: { serverAsr?: boolean })
   const [notice, setNotice] = useState<string | null>(null);
   const [contextOpen, setContextOpen] = useState(false);
   const [answers, setAnswers] = useState<Record<number, string>>({});
+
+  useEffect(() => {
+    fetch("/api/auth/me")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.user) {
+          setCurrentUser(data.user);
+          setHostName(data.user.name);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const unauthorizedWarning = searchParams.get("unauthorized") === "leadership";
+
+  async function handleLogout() {
+    await fetch("/api/auth/logout", { method: "POST" });
+    router.push("/login");
+    router.refresh();
+  }
 
   useEffect(() => {
     if (!submitting) return;
@@ -114,9 +139,38 @@ export function MobileCaptureApp({ serverAsr = false }: { serverAsr?: boolean })
           Hosts should experience this as a focused phone app: talk, review, close gaps, done.
           Command remains the desktop leadership surface.
         </p>
-        <Link href="/command" className="command-action-button mt-4 inline-flex">
-          Open Command
-        </Link>
+
+        {currentUser && (
+          <div className="mt-4 p-3 rounded-xl bg-white/[0.04] border border-white/10 space-y-1">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-slate-400">Authenticated user</span>
+              <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-[#43d9c7]/10 text-[#43d9c7] border border-[#43d9c7]/20">
+                {currentUser.role}
+              </span>
+            </div>
+            <p className="text-sm font-semibold text-slate-200">{currentUser.name}</p>
+            <p className="text-xs text-slate-400">{currentUser.email}</p>
+          </div>
+        )}
+
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          {currentUser?.role === "leader" ? (
+            <Link href="/command" className="command-action-button inline-flex">
+              Open Command
+            </Link>
+          ) : (
+            <span className="text-xs text-slate-400 italic">
+              Tour Host Mode · Capture debriefs below
+            </span>
+          )}
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-red-400 py-2 px-3 rounded-lg border border-white/10 hover:bg-white/5 transition-colors"
+          >
+            <LogOut className="h-3.5 w-3.5" />
+            <span>Sign out</span>
+          </button>
+        </div>
       </div>
 
       <section className="phone-frame" aria-label="Utah City mobile capture app">
@@ -129,12 +183,37 @@ export function MobileCaptureApp({ serverAsr = false }: { serverAsr?: boolean })
             </span>
           </div>
 
+          {unauthorizedWarning && (
+            <div className="mx-4 mt-3 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs flex items-start gap-2.5 animate-in fade-in">
+              <AlertCircle className="h-4 w-4 shrink-0 text-amber-400 mt-0.5" />
+              <div>
+                <p className="font-bold text-amber-300">Leadership Access Required</p>
+                <p className="text-[11px] text-amber-200/90 mt-0.5">
+                  Your account ({currentUser?.name || "Host"}) has Host permissions for tour debriefs. Command intelligence is restricted to Leadership accounts.
+                </p>
+              </div>
+            </div>
+          )}
+
           <div className="mobile-app-header">
             <div>
               <p className="text-[11px] font-black uppercase tracking-[0.16em] text-mobile-muted">Utah City</p>
               <h1>Guided tour debrief</h1>
             </div>
-            <span className="mobile-ready-dot" />
+            <div className="flex items-center gap-2">
+              {currentUser && (
+                <span className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 font-semibold">
+                  {currentUser.name}
+                </span>
+              )}
+              <button
+                onClick={handleLogout}
+                title="Sign out"
+                className="p-1.5 rounded-lg text-mobile-muted hover:text-red-400 transition-colors"
+              >
+                <LogOut className="h-3.5 w-3.5" />
+              </button>
+            </div>
           </div>
 
           <div className="mobile-trust-line">
