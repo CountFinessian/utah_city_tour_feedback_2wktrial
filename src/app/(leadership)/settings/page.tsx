@@ -18,7 +18,7 @@ export default async function SettingsPage() {
           Team access & admin controls
         </h1>
         <p className="mt-3 max-w-3xl text-sm leading-7 text-command-soft md:text-base">
-          Invite tour hosts and leadership to the pilot, manage invitations, and control demo corpus data.
+          Invite tour hosts and leadership to the platform, manage invitations, and control demo corpus data.
         </p>
       </header>
 

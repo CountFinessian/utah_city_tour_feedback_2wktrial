@@ -121,7 +121,7 @@ function LoginForm() {
         </div>
 
         <p className="text-center text-xs text-[#65758b]">
-          Utah City Host Intelligence Platform · Two-Week Internal Pilot
+          Utah City Host Intelligence Platform
         </p>
       </div>
     </div>
