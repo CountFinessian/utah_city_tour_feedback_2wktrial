@@ -1,4 +1,6 @@
+import { generateText } from "ai";
 import { amenityLabel, objectionLabel, type Observation } from "@/domain/observation";
+import { hasLLM, llmModel } from "@/server/ai/model-config";
 
 export type ObjectionAgg = {
   type: string;
@@ -229,5 +231,33 @@ function templateNarrative(d: Digest, observations: Observation[] = []): string 
 }
 
 export async function generateNarrative(d: Digest, observations: Observation[]): Promise<string> {
+  if (d.totalTours === 0) return templateNarrative(d, observations);
+  const guardrail = buildNarrativeGuardrail(d, observations);
+  if (guardrail.lowSample) return templateNarrative(d, observations);
+  if (!hasLLM()) return templateNarrative(d, observations);
+
+  const compact = {
+    totalTours: d.totalTours,
+    last7: d.last7,
+    prev7: d.prev7,
+    avgSentiment: d.avgSentiment,
+    intentFunnel: d.intentFunnel,
+    topObjections: d.topObjections.slice(0, 5).map((o) => ({ objection: o.label, count: o.count, highSeverity: o.highSeverity, example: o.example })),
+    amenities: d.amenityRanking.slice(0, 6).map((a) => ({ amenity: a.label, mentions: a.mentions, net: a.net })),
+    recurringQuestions: d.topQuestions.slice(0, 5).map((q) => ({ q: q.question, count: q.count })),
+  };
+
+  try {
+    const { text } = await generateText({
+      model: llmModel(),
+      system:
+        "You write the weekly 'What Hosts Are Hearing' brief for Utah City leadership. Be concise, concrete, and grounded ONLY in the supplied aggregates; never invent numbers. 120-180 words. Use confidence-aware language. Do not call a pattern a trend unless the supplied guardrail says operating trend. Lead with what changed, then top objection and top amenity, then a one-line recommended action. No bullet points, no preamble.",
+      prompt: `Guardrail: ${JSON.stringify(guardrail)}\nAggregated host-debrief data for this period:\n${JSON.stringify(compact, null, 2)}`,
+    });
+    return text.trim().replace(/\*\*/g, "");
+  } catch (err) {
+    console.error("[digest] narrative generation failed, using template:", err);
+    return templateNarrative(d, observations);
+  }
   return templateNarrative(d, observations);
 }

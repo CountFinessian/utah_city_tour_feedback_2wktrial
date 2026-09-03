@@ -34,6 +34,7 @@ function LoginForm() {
 
       // If user had a specific deep-link destination and their role allows it, respect it
       const destination = from && !(data.user.role === "host" && from !== "/") ? from : data.redirectTo;
+      window.location.href = destination;
     } catch {
       setError("Network error. Please try again.");
       setLoading(false);
