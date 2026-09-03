@@ -1,7 +1,7 @@
 import { amenityLabel, objectionLabel, type Observation } from "@/domain/observation";
 import { buildCommandCenter } from "@/server/intelligence/command-center";
 import { listObservations } from "@/server/repositories/observations";
-import { buildDigest, buildNarrativeGuardrail, generateNarrative } from "@/server/reporting/digest";
+import { buildDigest, buildNarrativeGuardrail, templateNarrative } from "@/server/reporting/digest";
 import type { EvidenceItem } from "@/components/domain/EvidencePopover";
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -78,7 +78,7 @@ export async function getCommandView() {
   const digest = buildDigest(observations);
   const commandCenter = buildCommandCenter(observations);
   const guardrail = buildNarrativeGuardrail(digest, observations);
-  const narrative = await generateNarrative(digest, observations);
+  const narrative = templateNarrative(digest, observations);
   const liveCount = observations.filter((observation) => observation.source === "live").length;
   const demoCount = observations.length - liveCount;
   const avgCoverage = observations.length
