@@ -91,15 +91,26 @@ export async function findUserByEmail(email: string): Promise<StoredUser | null>
     return null;
   }
 
-  await ensureUserSchema();
-  const rows = (await sql`
-    SELECT id, email, name, role, title, password_hash as "passwordHash", password_salt as "passwordSalt", created_at as "createdAt"
-    FROM users
-    WHERE LOWER(email) = ${normalized}
-    LIMIT 1
-  `) as StoredUser[];
+  try {
+    const rows = (await sql`
+      SELECT id, email, name, role, title, password_hash as "passwordHash", password_salt as "passwordSalt", created_at as "createdAt"
+      FROM users
+      WHERE LOWER(email) = ${normalized}
+      LIMIT 1
+    `) as StoredUser[];
 
-  return rows[0] ?? null;
+    return rows[0] ?? null;
+  } catch (err) {
+    // Lazy fallback: if table is missing, initialize and retry once
+    await ensureUserSchema();
+    const rows = (await sql`
+      SELECT id, email, name, role, title, password_hash as "passwordHash", password_salt as "passwordSalt", created_at as "createdAt"
+      FROM users
+      WHERE LOWER(email) = ${normalized}
+      LIMIT 1
+    `) as StoredUser[];
+    return rows[0] ?? null;
+  }
 }
 
 export async function createUser(user: Omit<StoredUser, "createdAt">): Promise<StoredUser> {

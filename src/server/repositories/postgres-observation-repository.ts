@@ -68,10 +68,15 @@ function toObservation(r: Row): Observation {
 
 export const postgresObservationRepository: ObservationRepository = {
   async listObservations(): Promise<Observation[]> {
-    await ensureSchema();
     const sql = db();
-    const rows = (await sql`select * from observations order by created_at desc`) as Row[];
-    return rows.map(toObservation);
+    try {
+      const rows = (await sql`select * from observations order by created_at desc`) as Row[];
+      return rows.map(toObservation);
+    } catch {
+      await ensureSchema();
+      const rows = (await sql`select * from observations order by created_at desc`) as Row[];
+      return rows.map(toObservation);
+    }
   },
 
   async upsertObservation(obs: Observation): Promise<Observation> {
