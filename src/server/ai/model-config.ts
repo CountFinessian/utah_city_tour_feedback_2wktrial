@@ -26,11 +26,21 @@ export function hasLLM(): boolean {
   return hasGoogleKey() || hasAnthropicKey() || hasGateway();
 }
 
+export const GOOGLE_MODELS = [
+  process.env.GOOGLE_MODEL ?? "gemini-3.7-flash",
+  "gemini-3.6-flash",
+  "gemini-3.5-flash",
+];
+
+export function getGoogleModel(modelName?: string) {
+  const google = getGoogle();
+  return google(modelName || GOOGLE_MODELS[0]);
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function llmModel(): any {
   if (hasGoogleKey()) {
-    const google = getGoogle();
-    return google(GOOGLE_MODEL);
+    return getGoogleModel();
   }
   if (hasAnthropicKey()) return anthropic(ANTHROPIC_MODEL);
   return GATEWAY_MODEL;

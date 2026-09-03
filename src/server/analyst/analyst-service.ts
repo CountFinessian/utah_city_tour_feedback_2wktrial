@@ -1,7 +1,7 @@
 import { generateText } from "ai";
 import { z } from "zod";
 import type { Observation } from "@/domain/observation";
-import { hasLLM, llmModel } from "@/server/ai/model-config";
+import { GOOGLE_MODELS, getGoogleModel, hasGoogleKey, hasLLM, llmModel } from "@/server/ai/model-config";
 import { listObservations } from "@/server/repositories/observations";
 import { buildDigest, buildNarrativeGuardrail } from "@/server/reporting/digest";
 import type { EvidenceItem } from "@/components/domain/EvidencePopover";
@@ -20,10 +20,8 @@ export type AnalystResponse = {
 
 function cleanAnalystText(text: string): string {
   return text
-    .replace(/\*\*/g, "")
     .replace(/^#{1,6}\s+/gm, "")
     .replace(/^---+$/gm, "")
-    .replace(/^\s*[-*]\s+/gm, "")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 }
@@ -120,37 +118,67 @@ export async function answerAnalystQuestion(question: string): Promise<AnalystRe
   if (!hasLLM() || observations.length === 0) return fallback;
 
   const digest = buildDigest(observations);
-  const guardrail = buildNarrativeGuardrail(digest, observations);
-  const evidence = fallback.evidence;
-  const compact = {
-    question,
-    guardrail,
-    digest: {
-      totalTours: digest.totalTours,
-      last7: digest.last7,
-      prev7: digest.prev7,
-      avgSentiment: digest.avgSentiment,
-      intentFunnel: digest.intentFunnel,
-      topObjections: digest.topObjections.slice(0, 5),
-      amenityRanking: digest.amenityRanking.slice(0, 5),
-      topQuestions: digest.topQuestions.slice(0, 5),
+  const terms = keywordTerms(question);
+  const matchedEvidence = evidenceFor(observations, terms);
+  const evidence = matchedEvidence.length > 0 ? matchedEvidence : evidenceFor(observations, []);
+
+  // Pass rich observation context so Gemini can cite real resident names and debriefs
+  const observationsContext = observations.map((o) => ({
+    name: o.hostName,
+    unitOrFloorPlan: o.floorPlan,
+    prospectTag: o.prospectTag,
+    summary: o.extraction.summary,
+    transcript: o.transcript,
+    objections: o.extraction.objections.map((obj) => `${obj.type}: ${obj.detail}`),
+    amenities: o.extraction.amenities.map((a) => `${a.name} (${a.reaction}): ${a.detail}`),
+    sentiment: o.extraction.overallSentiment,
+  }));
+
+  const payload = {
+    userQuestion: question,
+    totalObservationsInCorpus: observations.length,
+    activeResidentObservations: observationsContext,
+    highLevelMetrics: {
+      averageSentiment: digest.avgSentiment,
+      topObjectionSignals: digest.topObjections,
+      topAmenitySignals: digest.amenityRanking,
     },
-    evidence,
   };
 
-  try {
-    const { text } = await generateText({
-      model: llmModel(),
-      system:
-        "You are Utah City's senior business analyst. Answer only from the provided aggregates and evidence. Be concise. Use confidence-aware language. Do not make protected-class housing recommendations. If sample size is low, say so. Plain text only: no markdown headings, no bullets, no separators.",
-      prompt: JSON.stringify(compact, null, 2),
-    });
-    return {
-      ...fallback,
-      answer: cleanAnalystText(text),
-    };
-  } catch (error) {
-    console.error("[analyst] LLM answer failed:", error);
-    return fallback;
+  const modelsToTry = hasGoogleKey()
+    ? GOOGLE_MODELS.map((m) => getGoogleModel(m))
+    : [llmModel()];
+
+  let lastError: unknown = null;
+  for (const model of modelsToTry) {
+    try {
+      const { text } = await generateText({
+        model,
+        system: `You are Utah City's Senior Intelligence Analyst. You provide direct, articulate, and insightful analysis to executive leadership based on resident feedback and tour debriefs from 120 & 220 Bend and Utah City.
+
+Core guidelines:
+1. Speak naturally, intelligently, and directly like an expert analyst pair-programming with leadership.
+2. DO NOT prepend canned corporate boilerplate (e.g. NEVER start with "Capture volume is sufficient for an operating trend read based on N recorded tours"). Jump straight into the insight.
+3. If the user sends a greeting or conversational query (like "hi", "hello", "hey", "who are you?"), greet them warmly in 1-2 friendly sentences, introduce yourself as Utah City's Intelligence Analyst, and suggest 3 specific topics they can ask you about (e.g. staff feedback for Aiden and Kingsley, bike path safety, or e-bike fleet maintenance).
+4. Ground your answers in the provided resident debriefs. Whenever applicable, cite specific residents by name (e.g. "Spencer Nelson noted...", "Zjanya Arwood highlighted...") and describe what they said.
+5. When summarizing complaints or multi-part questions, organize your response with clean paragraphs and bullet points for high executive readability.
+6. If a question asks about a topic that is NOT mentioned in the recorded debriefs (such as parking, swimming pool, pet fees), state clearly and honestly that across the current 16 resident debriefs from 120 & 220 Bend, no resident has mentioned or raised concerns about that topic.`,
+        prompt: JSON.stringify(payload, null, 2),
+      });
+      return {
+        ...fallback,
+        answer: cleanAnalystText(text),
+        evidence,
+      };
+    } catch (err) {
+      lastError = err;
+      console.warn("[analyst] Model failed, trying next fallback model...", err);
+    }
   }
+
+  console.error("[analyst] All LLM models failed:", lastError);
+  return {
+    ...fallback,
+    answer: "⚠️ Google AI rate limit or quota reached on the free tier. Please wait 30 seconds before submitting another question, or add a billing method in Google AI Studio to unlock unlimited requests.",
+  };
 }

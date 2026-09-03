@@ -94,7 +94,9 @@ export function AnalystConsole() {
             messages.map((message, index) => (
               <article key={`${message.question}-${index}`} className="analyst-message">
                 <p className="text-sm font-semibold text-command-accent">Q: {message.question}</p>
-                <p className="mt-3 text-base leading-8 text-command-ink">{message.response.answer}</p>
+                <div className="mt-3 text-base leading-relaxed text-command-ink whitespace-pre-wrap font-normal">
+                  {message.response.answer}
+                </div>
                 <div className="mt-4 flex flex-wrap items-center gap-2">
                   <ConfidenceBadge level={message.response.confidence} sampleSize={message.response.sampleSize} />
                   <EvidencePopover count={message.response.evidence.length} items={message.response.evidence} />
