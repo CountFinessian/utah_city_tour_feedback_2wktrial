@@ -109,7 +109,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
-      <div className="min-w-0">
+      <div className="min-w-0 bg-command-bg flex flex-col min-h-screen">
         <header className="sticky top-0 z-20 border-b border-border bg-white/92 backdrop-blur lg:hidden">
           <div className="flex items-center justify-between px-4 py-3">
             <Link href="/command" className="flex items-center gap-2 font-bold">
@@ -173,7 +173,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </div>
 
-        <main className="mx-auto w-full max-w-[1480px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">{children}</main>
+        <main className="mx-auto w-full max-w-[1480px] flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-8 bg-command-bg">{children}</main>
       </div>
     </div>
   );

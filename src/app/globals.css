@@ -82,8 +82,8 @@
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: var(--command-bg);
+  color: var(--command-ink);
   font-family: var(--font-sans);
   letter-spacing: 0;
   text-rendering: optimizeLegibility;
@@ -103,10 +103,7 @@ select {
 @layer components {
   .app-shell {
     min-height: 100vh;
-    background:
-      linear-gradient(90deg, rgba(11, 18, 32, 0.035) 0, rgba(11, 18, 32, 0) 360px),
-      linear-gradient(180deg, #fbfcfe 0, #f2f5f8 340px),
-      var(--background);
+    background: var(--command-bg);
   }
 
   .sidebar {
