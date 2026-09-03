@@ -152,9 +152,10 @@ export async function answerAnalystQuestion(question: string): Promise<AnalystRe
   let lastError: unknown = null;
   for (const model of modelsToTry) {
     try {
-      const { text } = await generateText({
+      const fetchPromise = generateText({
         model,
         temperature: 0.1,
+        maxRetries: 0,
         system: `You are Utah City's Senior Intelligence Analyst. You provide fast, direct, and concise executive analysis based on resident debriefs from 120 & 220 Bend.
 
 Rules:
@@ -165,6 +166,12 @@ Rules:
 5. If a topic is not in the records (e.g., parking), state directly in 1-2 sentences that no residents have mentioned concerns about that topic across the 16 recorded debriefs.`,
         prompt: JSON.stringify(payload, null, 2),
       });
+
+      const timeoutPromise = new Promise<{ text: string }>((_, reject) =>
+        setTimeout(() => reject(new Error("Model response timeout")), 4500)
+      );
+
+      const { text } = await Promise.race([fetchPromise, timeoutPromise]);
       return {
         ...fallback,
         answer: cleanAnalystText(text),
@@ -172,7 +179,7 @@ Rules:
       };
     } catch (err) {
       lastError = err;
-      console.warn("[analyst] Model failed, trying next fallback model...", err);
+      console.warn("[analyst] Model failed or timed out, trying next fallback model...", err instanceof Error ? err.message : err);
     }
   }
 

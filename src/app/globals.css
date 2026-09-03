@@ -1587,4 +1587,20 @@ select {
       border-radius: 0;
     }
   }
+
+  @keyframes analystBeam {
+    0% {
+      transform: translateX(-100%);
+    }
+    100% {
+      transform: translateX(350%);
+    }
+  }
+
+  .analyst-loading-bar {
+    width: 35%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, #43d9c7, #34d399, transparent);
+    animation: analystBeam 1.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  }
 }
