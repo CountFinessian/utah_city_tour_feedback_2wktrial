@@ -79,7 +79,13 @@ export function buildDigest(observations: Observation[]): Digest {
   for (const s of sentiments) sentimentDist[String(s)] = (sentimentDist[String(s)] ?? 0) + 1;
 
   const intentFunnel = { hot: 0, warm: 0, cold: 0, unknown: 0 };
-  for (const o of observations) intentFunnel[o.extraction.prospectIntent] += 1;
+  for (const o of observations) {
+    const raw = String(o.extraction.prospectIntent || "").toLowerCase();
+    if (raw === "hot" || raw === "signed") intentFunnel.hot += 1;
+    else if (raw === "warm" || raw === "hesitant") intentFunnel.warm += 1;
+    else if (raw === "cold") intentFunnel.cold += 1;
+    else intentFunnel.unknown += 1;
+  }
 
   const objMap = new Map<string, ObjectionAgg>();
   for (const o of observations) {

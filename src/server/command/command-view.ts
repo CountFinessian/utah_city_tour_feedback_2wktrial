@@ -38,22 +38,27 @@ function avg(nums: number[]): number | null {
 }
 
 function sentimentTimeline(observations: Observation[]) {
-  const now = Date.now();
-  return Array.from({ length: 14 }, (_, index) => {
-    const date = new Date(now - (13 - index) * DAY);
-    date.setHours(0, 0, 0, 0);
-    const start = date.getTime();
-    const end = start + DAY;
-    const rows = observations.filter((observation) => {
-      const t = Date.parse(observation.createdAt);
-      return t >= start && t < end;
-    });
-    return {
-      label: date.toLocaleDateString("en-US", { month: "numeric", day: "numeric" }),
-      sentiment: avg(rows.map((row) => row.extraction.overallSentiment)),
-      count: rows.length,
-    };
-  });
+  if (observations.length === 0) return [];
+
+  const sorted = [...observations].sort(
+    (a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt)
+  );
+
+  const byDate = new Map<string, { label: string; values: number[] }>();
+  for (const o of sorted) {
+    const d = new Date(o.createdAt);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    const label = d.toLocaleDateString("en-US", { month: "numeric", day: "numeric" });
+    const cur = byDate.get(key) ?? { label, values: [] };
+    cur.values.push(o.extraction.overallSentiment);
+    byDate.set(key, cur);
+  }
+
+  return Array.from(byDate.values()).map((item) => ({
+    label: item.label,
+    sentiment: avg(item.values),
+    count: item.values.length,
+  }));
 }
 
 function freshness(observations: Observation[]): string {
