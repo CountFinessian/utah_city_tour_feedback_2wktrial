@@ -138,7 +138,9 @@ export function AnalystConsole() {
                 </div>
                 <div className="mt-4 flex flex-wrap items-center gap-2">
                   <ConfidenceBadge level={message.response.confidence} sampleSize={message.response.sampleSize} />
-                  <EvidencePopover count={message.response.evidence.length} items={message.response.evidence} />
+                  {message.response.evidence && message.response.evidence.length > 0 && (
+                    <EvidencePopover count={message.response.evidence.length} items={message.response.evidence} />
+                  )}
                 </div>
                 <div className="mt-4 border-t border-command-border pt-4">
                   <p className="command-label">Push to action</p>

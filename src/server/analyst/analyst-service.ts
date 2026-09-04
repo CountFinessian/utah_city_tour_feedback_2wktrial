@@ -23,9 +23,16 @@ function cleanAnalystText(text: string): string {
   return text
     .replace(/^#{1,6}\s+/gm, "")
     .replace(/^---+$/gm, "")
+    .replace(/\*{3,}/g, "")
+    .replace(/\*\*/g, "")
+    .replace(/^\s*[\*\-]\s+/gm, "• ")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 }
+
+const GREETING_WORDS = new Set([
+  "hi", "hello", "hey", "good", "morning", "afternoon", "evening", "there", "what", "tell", "about", "me", "the", "are", "you", "who", "can", "how", "please", "some", "with"
+]);
 
 function excerptFor(transcript: string, terms: string[]): string {
   const text = transcript.trim();
@@ -33,7 +40,7 @@ function excerptFor(transcript: string, terms: string[]): string {
   const normalized = text.toLowerCase();
   const tokens = terms
     .flatMap((term) => term.toLowerCase().split(/[^a-z0-9]+/))
-    .filter((term) => term.length >= 4);
+    .filter((term) => term.length >= 4 && !GREETING_WORDS.has(term));
   const token = tokens.find((term) => normalized.includes(term));
   const index = token ? normalized.indexOf(token) : 0;
   const start = Math.max(0, index - 90);
@@ -42,7 +49,12 @@ function excerptFor(transcript: string, terms: string[]): string {
 }
 
 function evidenceFor(observations: Observation[], terms: string[]): EvidenceItem[] {
-  const normalizedTerms = terms.map((term) => term.toLowerCase()).filter(Boolean);
+  const normalizedTerms = terms
+    .map((term) => term.toLowerCase().trim())
+    .filter((t) => t.length >= 3 && !GREETING_WORDS.has(t));
+
+  if (normalizedTerms.length === 0) return [];
+
   return observations
     .filter((observation) => {
       const haystack = [
@@ -54,7 +66,7 @@ function evidenceFor(observations: Observation[], terms: string[]): EvidenceItem
       ]
         .join(" ")
         .toLowerCase();
-      return normalizedTerms.length === 0 || normalizedTerms.some((term) => haystack.includes(term));
+      return normalizedTerms.some((term) => haystack.includes(term));
     })
     .slice(0, 5)
     .map((observation) => ({
@@ -69,7 +81,7 @@ function keywordTerms(question: string): string[] {
   return question
     .toLowerCase()
     .split(/[^a-z0-9]+/)
-    .filter((term) => term.length > 3)
+    .filter((term) => term.length >= 3 && !GREETING_WORDS.has(term))
     .slice(0, 12);
 }
 
@@ -135,8 +147,7 @@ export async function answerAnalystQuestion(question: string): Promise<AnalystRe
 
   const digest = buildDigest(observations);
   const terms = keywordTerms(question);
-  const matchedEvidence = evidenceFor(observations, terms);
-  const evidence = matchedEvidence.length > 0 ? matchedEvidence : evidenceFor(observations, []);
+  const evidence = evidenceFor(observations, terms);
 
   // 2. Obtain or create Google Gemini Context Cache (~90% cheaper token billing)
   const contextCacheName = await getOrSetContextCache(observations, digest);
@@ -178,9 +189,9 @@ export async function answerAnalystQuestion(question: string): Promise<AnalystRe
         system: `You are Utah City's Senior Intelligence Analyst. You provide fast, direct, and concise executive analysis based on resident debriefs from 120 & 220 Bend.
 
 Rules:
-1. Be fast, direct, and concise. Keep responses under 130-160 words with quick, readable bullet points. Avoid filler or long essays.
-2. DO NOT use canned boilerplate phrases like "Capture volume is sufficient...".
-3. Cite resident names directly when sharing feedback (e.g., "**Spencer Nelson** flagged...", "**Zjanya Arwood** noted...").
+1. Be fast, direct, and concise. Keep responses under 130-160 words with quick, readable bullet points using '• '. Avoid filler or long essays.
+2. DO NOT use markdown asterisks (**) anywhere. Do NOT wrap names or titles in asterisks. Write clean, natural plain text.
+3. Cite resident names directly in plain text (e.g., Spencer Nelson flagged..., Zjanya Arwood noted...).
 4. If the user ONLY sends a greeting with no topic (e.g. just "hi" or "hello"), reply in 2 friendly sentences explaining what you analyze and suggest 2 topics to ask about. If they ask about a topic (such as amenities, parking, or safety), directly answer their question with debrief findings.
 5. If a topic is not in the records (e.g., parking), state directly in 1-2 sentences that no residents have mentioned concerns about that topic across the 16 recorded debriefs.`,
         prompt: contextCacheName ? `Question: ${question}` : JSON.stringify(payload, null, 2),
