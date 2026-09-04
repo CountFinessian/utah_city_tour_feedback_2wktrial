@@ -67,6 +67,12 @@ export function Recorder({
   }
 
   async function handleBlob(blob: Blob) {
+    if (blob.size < 4000) {
+      setNote("No speech detected — speak clearly or type below.");
+      setPhase("idle");
+      return;
+    }
+
     if (serverAsr) {
       setPhase("transcribing");
       try {
@@ -74,13 +80,18 @@ export function Recorder({
         fd.append("audio", blob, "debrief.webm");
         const res = await fetch("/api/transcribe", { method: "POST", body: fd });
         const json = await res.json();
-        if (json.text) {
-          onText(json.text as string);
+        const text = (json.text as string | undefined)?.trim();
+        if (text) {
+          onText(text);
           setPhase("idle");
           return;
         }
         if (!json.unavailable) {
-          setNote(json.error || "Couldn't transcribe audio. Type below.");
+          if (json.error) {
+            setNote(json.error);
+          } else {
+            setNote("No speech detected — speak clearly or type below.");
+          }
           setPhase("idle");
           return;
         }
@@ -104,8 +115,9 @@ export function Recorder({
           setPhase("transcribing");
         }
       });
-      if (text) onText(text);
-      else setNote("Didn't catch any speech — try again or type below.");
+      const trimmed = text?.trim();
+      if (trimmed) onText(trimmed);
+      else setNote("No speech detected — speak clearly or type below.");
     } catch (err) {
       console.error("[whisper] on-device transcription failed:", err);
       setNote("Voice transcription unavailable. Type your debrief below.");
@@ -126,80 +138,44 @@ export function Recorder({
             type="button"
             onClick={start}
             disabled={busy}
-            className="w-full min-h-[92px] px-5 py-4 flex items-center justify-between gap-4 text-left transition-all group bg-white/[0.02] hover:bg-white/[0.06] active:bg-white/[0.08]"
+            aria-label="Record voice debrief"
+            className="w-full min-h-[84px] py-4 flex items-center justify-center transition-all bg-transparent hover:bg-white/[0.04] active:scale-[0.99] group"
           >
-            <div className="flex items-center gap-3.5">
-              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-command-accent/15 text-command-accent border border-command-accent/25 group-hover:bg-command-accent group-hover:text-black group-hover:scale-105 transition-all shadow-sm">
-                <Mic className="h-5 w-5" />
-              </span>
-              <div>
-                <div className="text-sm font-bold text-slate-100 group-hover:text-white transition-colors">
-                  Record Voice Debrief
-                </div>
-                <div className="text-xs text-slate-400 mt-0.5">
-                  Tap anywhere to record · Fast Gemini transcription
-                </div>
-              </div>
-            </div>
-
-            <span className="text-[11px] font-semibold text-command-accent/90 px-3 py-1.5 rounded-xl bg-command-accent/10 border border-command-accent/20 shrink-0 group-hover:bg-command-accent/20 transition-colors">
-              Tap to record
+            <span className="grid h-12 w-12 place-items-center rounded-2xl bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 group-hover:bg-emerald-500/25 group-hover:scale-105 active:scale-95 transition shadow-sm">
+              <Mic className="h-6 w-6" />
             </span>
           </button>
         )}
 
         {phase === "recording" && (
-          <div className="w-full min-h-[92px] px-5 py-4 flex items-center justify-between gap-4 bg-rose-500/10 border-rose-500/30 animate-in fade-in">
-            <div className="flex items-center gap-3.5">
-              <span className="relative flex h-3 w-3 shrink-0">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75" />
-                <span className="relative inline-flex rounded-full h-3 w-3 bg-rose-500" />
-              </span>
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold uppercase tracking-wider text-rose-300">Recording</span>
-                  <span className="font-mono text-sm font-bold tabular-nums text-rose-100">{mmss}</span>
-                </div>
-                <div className="flex items-center gap-1 h-3.5 mt-1">
-                  <span className="w-1 h-2 bg-rose-400/80 rounded-full animate-pulse" />
-                  <span className="w-1 h-4 bg-rose-400 rounded-full animate-pulse [animation-delay:150ms]" />
-                  <span className="w-1 h-2.5 bg-rose-400/70 rounded-full animate-pulse [animation-delay:300ms]" />
-                  <span className="w-1 h-4 bg-rose-400 rounded-full animate-pulse [animation-delay:75ms]" />
-                  <span className="w-1 h-2 bg-rose-400/80 rounded-full animate-pulse [animation-delay:200ms]" />
-                </div>
-              </div>
+          <div className="w-full min-h-[84px] px-6 py-4 flex items-center justify-center gap-5 animate-in fade-in">
+            <div className="flex items-center gap-2">
+              <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="font-mono text-sm font-semibold tabular-nums text-slate-200">{mmss}</span>
             </div>
 
             <button
               type="button"
               onClick={stop}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 active:scale-95 text-white font-bold text-xs shadow-md transition-all shrink-0"
+              aria-label="Stop recording"
+              title="Stop recording"
+              className="h-9 w-9 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 border border-white/15 flex items-center justify-center text-slate-200 transition"
             >
               <Square className="h-3.5 w-3.5 fill-current" />
-              <span>Finish Recording</span>
             </button>
           </div>
         )}
 
         {busy && (
-          <div className="w-full min-h-[92px] px-5 py-4 flex items-center justify-center gap-3 text-center animate-in fade-in">
-            <Loader2 className="h-5 w-5 animate-spin text-command-accent shrink-0" />
-            <div className="text-left">
-              <div className="text-sm font-semibold text-slate-200">
-                {phase === "loading" && dlPct !== null
-                  ? `Loading voice model… ${dlPct}%`
-                  : "Transcribing audio..."}
-              </div>
-              <div className="text-xs text-slate-400 mt-0.5">
-                Processing speech
-              </div>
-            </div>
+          <div className="w-full min-h-[84px] py-4 flex items-center justify-center gap-2 text-slate-400 text-xs font-medium animate-in fade-in">
+            <Loader2 className="h-4 w-4 animate-spin text-emerald-400" />
+            <span>Transcribing...</span>
           </div>
         )}
 
         {note && (
-          <div className="p-3 pt-0">
-            <p className="w-full rounded-xl border border-amber-400/30 bg-amber-500/10 px-3.5 py-2 text-center text-xs text-amber-200">
+          <div className="px-4 pb-3">
+            <p className="w-full rounded-xl border border-amber-400/30 bg-amber-500/10 px-3 py-1.5 text-center text-xs text-amber-200">
               {note}
             </p>
           </div>
