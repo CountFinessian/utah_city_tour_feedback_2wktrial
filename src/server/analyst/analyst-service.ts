@@ -65,7 +65,14 @@ const STOP_WORDS = new Set([
   "corpus", "data", "lead", "leads", "feedback", "debrief", "debriefs", "record", "records",
   "please", "give", "show", "find", "look", "search", "check",
   "hi", "hu", "hello", "hey", "good", "morning", "afternoon", "evening", "help", "test",
-  "peiple", "peple", "ppl", "folks", "guy", "guys"
+  "peiple", "peple", "ppl", "folks", "guy", "guys",
+  "put", "puts", "putting", "being", "been", "was", "were", "are", "is",
+  "will", "would", "shall", "should", "can", "could", "may", "might", "must",
+  "about", "into", "onto", "upon", "over", "under", "again", "further", "then", "once", "here",
+  "all", "any", "both", "each", "few", "more", "most", "other", "such",
+  "only", "own", "same", "than", "too", "very", "just", "now",
+  "like", "likes", "liked", "liking", "want", "wants", "wanted", "wanting",
+  "also", "well", "even", "really", "get", "gets", "getting", "got", "make", "makes", "making", "made"
 ]);
 
 const TOPIC_SYNONYMS: Record<string, string[]> = {
@@ -323,7 +330,7 @@ export async function answerWithOneShotRAG(
             model,
             temperature: 0.1,
             maxRetries: 0,
-            prompt: `User Question: ${question}\n\nAnswer directly from the debrief corpus. If asked "how many people", count the debriefs explicitly. Cite real resident names, quote their specific feedback, and write clean plain text with no asterisks. At the end on a new line, output: CITED_OBSERVATIONS: [id1, id2] with only the IDs of observations used.`,
+            prompt: `User Question: ${question}\n\nAnswer directly from the debrief corpus. If asked "how many people", count the debriefs explicitly. Cite real resident names, quote their specific feedback, and write clean plain text with no asterisks. At the end on a new line, output: CITED_OBSERVATIONS: [id1, id2] with only the IDs of observations used. If no observations were used or there is insufficient evidence, output: CITED_OBSERVATIONS: []`,
             providerOptions: {
               google: {
                 cachedContent: contextCacheName,
@@ -357,7 +364,7 @@ export async function answerWithOneShotRAG(
         text = res.text;
       }
 
-      let resolvedEvidence = evidence;
+      let resolvedEvidence: EvidenceItem[] = [];
       const citedMatch = text.match(/CITED_OBSERVATIONS:\s*\[(.*?)\]/i);
       if (citedMatch) {
         const citedIds = citedMatch[1]
@@ -366,26 +373,64 @@ export async function answerWithOneShotRAG(
           .filter(Boolean);
         text = text.replace(/CITED_OBSERVATIONS:\s*\[.*?\]/i, "").trim();
 
-        const matchedObs = observations.filter((o) => citedIds.includes(o.id));
-        if (matchedObs.length > 0) {
+        if (citedIds.length > 0) {
+          const matchedObs = observations.filter((o) => citedIds.includes(o.id));
           resolvedEvidence = matchedObs.map((obs) =>
             buildEvidenceItem(obs, terms.length > 0 ? terms : [question])
           );
+        } else {
+          resolvedEvidence = [];
+        }
+      } else {
+        const lower = text.toLowerCase();
+        const isInsufficient =
+          lower.includes("insufficient evidence") ||
+          lower.includes("no direct resident observations") ||
+          lower.includes("no observations found") ||
+          lower.includes("no relevant debrief") ||
+          lower.includes("none of the debriefs") ||
+          lower.includes("no resident mentioned") ||
+          lower.includes("not mentioned in the debrief") ||
+          lower.includes("not discussed");
+
+        if (isInsufficient) {
+          resolvedEvidence = [];
+        } else {
+          resolvedEvidence = reconcileEvidenceWithAnswer(
+            text,
+            [],
+            observations,
+            terms
+          );
+          if (resolvedEvidence.length === 0 && evidence.length > 0) {
+            const textHasEvidenceMention = evidence.some((e) => {
+              const cleanName = (e.meta || "").split("·")[0].trim().toLowerCase();
+              return cleanName.length >= 3 && lower.includes(cleanName);
+            });
+            if (textHasEvidenceMention) {
+              resolvedEvidence = evidence;
+            }
+          }
         }
       }
 
-      const reconciledEvidence = reconcileEvidenceWithAnswer(
-        text,
-        resolvedEvidence,
-        observations,
-        terms
-      );
+      const cleanedAnswer = cleanAnalystText(text);
+      const answerLower = cleanedAnswer.toLowerCase();
+      if (
+        answerLower.includes("insufficient evidence") ||
+        answerLower.includes("no direct resident observations") ||
+        answerLower.includes("no observations found") ||
+        answerLower.includes("none of the debriefs") ||
+        answerLower.includes("no relevant debrief")
+      ) {
+        resolvedEvidence = [];
+      }
 
       const latencyMs = Date.now() - startTime;
       const finalResponse: AnalystResponse = {
         ...fallback,
-        answer: cleanAnalystText(text),
-        evidence: reconciledEvidence,
+        answer: cleanedAnswer,
+        evidence: resolvedEvidence,
         metrics: {
           latencyMs,
           mode: "rag",

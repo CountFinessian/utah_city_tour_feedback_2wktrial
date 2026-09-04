@@ -94,9 +94,19 @@ export async function runAgenticRetrieval(
       }
 
       const matchedObs = observations.filter((o) => citedIds.includes(o.id));
-      const evidence = matchedObs.map((obs) => buildEvidenceItem(obs, [question]));
+      let evidence = matchedObs.map((obs) => buildEvidenceItem(obs, [question]));
 
       const cleanedAnswer = cleanText(text);
+      const answerLower = cleanedAnswer.toLowerCase();
+      if (
+        answerLower.includes("insufficient evidence") ||
+        answerLower.includes("no direct resident observations") ||
+        answerLower.includes("no observations found") ||
+        answerLower.includes("none of the debriefs") ||
+        answerLower.includes("no relevant debrief")
+      ) {
+        evidence = [];
+      }
 
       return {
         answer: cleanedAnswer || "No direct resident observations found matching this query.",
