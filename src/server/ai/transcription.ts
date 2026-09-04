@@ -9,6 +9,12 @@ const UNAVAILABLE_MESSAGE =
   "Server transcription isn't configured. Using your browser's voice engine, or type below.";
 
 const SILENCE_HALLUCINATIONS = [
+  "uh-oh",
+  "uhoh",
+  "one, two, three, go",
+  "one two three go",
+  "1, 2, 3, go",
+  "1 2 3 go",
   "didn't flag the incident",
   "metric we use is based on volume",
   "get in touch with engineering",
@@ -26,6 +32,18 @@ const SILENCE_HALLUCINATIONS = [
 function isHallucinationOrSilence(text: string): boolean {
   const lower = text.toLowerCase().trim();
   if (!lower) return true;
+  const clean = lower.replace(/[^a-z0-9\s]/g, " ").trim();
+  if (
+    clean === "uh oh" ||
+    clean === "uhoh" ||
+    clean === "one two three go" ||
+    clean === "1 2 3 go" ||
+    clean === "you" ||
+    clean === "thank you" ||
+    clean === "thanks"
+  ) {
+    return true;
+  }
   return SILENCE_HALLUCINATIONS.some((phrase) => lower.includes(phrase));
 }
 
@@ -60,7 +78,7 @@ export async function transcribeAudio(audio: Blob): Promise<TranscribeResult> {
               role: "user",
               parts: [
                 {
-                  text: "You are a verbatim speech-to-text transcriber. Transcribe ONLY the real human speech spoken in this audio. If the audio is silent, blank, contains no spoken words, or only contains background noise, output NOTHING (return an empty string). NEVER guess, hallucinate, or output made-up speech.",
+                  text: "You are an automated speech-to-text transcriber for resident debriefs. Transcribe ONLY actual spoken human words. If there is no human speech (only silence, background noise, microphone clicks, static, breathing), output NOTHING (return an empty string). NEVER output guesses or hallucinated phrases such as 'Uh-oh', 'One, two, three, go', 'Thank you', or 'You'. If unsure or silent, return an empty string.",
                 },
                 {
                   inlineData: {

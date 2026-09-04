@@ -23,10 +23,33 @@ export function Recorder({
   const mediaRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const startTimeRef = useRef<number>(0);
 
   function clearTimer() {
     if (timerRef.current) clearInterval(timerRef.current);
     timerRef.current = null;
+  }
+
+  const NOISE_PHRASES = [
+    "uh oh",
+    "uhoh",
+    "one two three go",
+    "1 2 3 go",
+    "one two three",
+    "thank you",
+    "thanks",
+    "bye",
+    "goodbye",
+    "you",
+    "silence",
+    "empty",
+    "subtitles",
+  ];
+
+  function isNoiseOrHallucination(text: string): boolean {
+    const clean = text.toLowerCase().replace(/[^a-z0-9\s]/g, " ").trim();
+    if (!clean || clean.length < 4) return true;
+    return NOISE_PHRASES.some((phrase) => clean === phrase || clean.startsWith(`${phrase} `));
   }
 
   async function start() {
@@ -39,6 +62,7 @@ export function Recorder({
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const recorder = new MediaRecorder(stream);
       chunksRef.current = [];
+      startTimeRef.current = Date.now();
       recorder.ondataavailable = (e) => {
         if (e.data.size) chunksRef.current.push(e.data);
       };
@@ -46,6 +70,12 @@ export function Recorder({
         stream.getTracks().forEach((t) => t.stop());
         clearTimer();
         setSeconds(0);
+        const durationMs = Date.now() - startTimeRef.current;
+        if (durationMs < 1200) {
+          setNote("Recording was too short — tap to record, speak your debrief, then tap stop.");
+          setPhase("idle");
+          return;
+        }
         const blob = new Blob(chunksRef.current, { type: recorder.mimeType || "audio/webm" });
         await handleBlob(blob);
       };
@@ -81,7 +111,7 @@ export function Recorder({
         const res = await fetch("/api/transcribe", { method: "POST", body: fd });
         const json = await res.json();
         const text = (json.text as string | undefined)?.trim();
-        if (text) {
+        if (text && !isNoiseOrHallucination(text)) {
           onText(text);
           setPhase("idle");
           return;
@@ -116,8 +146,11 @@ export function Recorder({
         }
       });
       const trimmed = text?.trim();
-      if (trimmed) onText(trimmed);
-      else setNote("No speech detected — speak clearly or type below.");
+      if (trimmed && !isNoiseOrHallucination(trimmed)) {
+        onText(trimmed);
+      } else {
+        setNote("No speech detected — speak clearly or type below.");
+      }
     } catch (err) {
       console.error("[whisper] on-device transcription failed:", err);
       setNote("Voice transcription unavailable. Type your debrief below.");
