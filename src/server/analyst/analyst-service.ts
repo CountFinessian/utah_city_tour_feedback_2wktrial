@@ -73,12 +73,28 @@ function matchesTerm(haystack: string, term: string): boolean {
 function excerptFor(transcript: string, terms: string[]): string {
   const text = transcript.trim();
   if (!text) return "Transcript evidence unavailable.";
+
+  // Extract only the sentence(s) directly discussing the relevant topic
+  const sentences = text.match(/[^.!?]+[.!?]+/g) || [text];
+  const matching = sentences
+    .map((s) => s.trim())
+    .filter((s) => {
+      const sNorm = s.toLowerCase();
+      return terms.some((term) => matchesTerm(sNorm, term));
+    });
+
+  if (matching.length > 0) {
+    const quote = matching.slice(0, 2).join(" ");
+    return quote.startsWith('"') ? quote : `"${quote}"`;
+  }
+
   const normalized = text.toLowerCase();
   const token = terms.find((term) => matchesTerm(normalized, term));
   const index = token ? normalized.indexOf(token) : 0;
-  const start = Math.max(0, index - 90);
-  const end = Math.min(text.length, index + 220);
-  return `${start > 0 ? "..." : ""}${text.slice(start, end)}${end < text.length ? "..." : ""}`;
+  const start = Math.max(0, index - 20);
+  const end = Math.min(text.length, index + 90);
+  const slice = text.slice(start, end).trim();
+  return `"${slice}"`;
 }
 
 function evidenceFor(observations: Observation[], terms: string[]): EvidenceItem[] {
@@ -145,11 +161,12 @@ function heuristicAnswer(question: string, observations: Observation[]): Analyst
     const topic = terms.join(", ");
     const count = evidence.length;
     answer =
-      `Based on the captured debriefs, ${count} resident observation${count === 1 ? "" : "s"} mentioned ${topic}:\n` +
-      evidence.map((e) => `• ${e.meta}: "${e.excerpt}"`).join("\n");
+      `Based on the captured debriefs, ${count} resident observation${count === 1 ? "" : "s"} discussed ${topic}.\n\n` +
+      evidence.map((e) => `• ${e.meta}: ${e.label}`).join("\n") +
+      `\n\nSupporting quotes and excerpts are available in the Evidence panel below.`;
   } else if (terms.length > 0 && evidence.length === 0) {
     const topic = terms.join(", ");
-    answer = `No residents or tour debriefs mentioned "${topic}" across the 16 recorded debriefs for 120 & 220 Bend.`;
+    answer = `There is insufficient evidence in the debrief records to answer this prompt regarding "${topic}".`;
   } else if (q.includes("parking") || q.includes("objection")) {
     const parking = digest.topObjections.find((item) => item.type === "parking");
     const top = digest.topObjections[0];

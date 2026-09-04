@@ -18,13 +18,13 @@ describe("Analyst Service Response & Guidance", () => {
     expect(resHi.evidence).toHaveLength(0);
   });
 
-  it("answers 'how many people talked about bikes?' with quotation marks around quotes and precise evidence", async () => {
+  it("answers 'how many people talked about bikes?' with executive synthesis and precise evidence quotes", async () => {
     const res = await answerAnalystQuestion("how many people talked about bikes?");
     expect(res.answer.toLowerCase()).toContain("bike");
-    // Must include quotation marks around quotes
-    expect(res.answer).toContain('"');
     expect(res.evidence.length).toBeGreaterThanOrEqual(1);
     expect(res.evidence.every((e) => e.excerpt.toLowerCase().includes("bike"))).toBe(true);
+    // Supporting quotes in evidence panel are wrapped in quotation marks
+    expect(res.evidence.some((e) => e.excerpt.includes('"'))).toBe(true);
   });
 
   it("does not output markdown asterisks in answer", async () => {
