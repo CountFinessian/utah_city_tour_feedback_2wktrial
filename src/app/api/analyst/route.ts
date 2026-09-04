@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const response = await answerAnalystQuestion(parsed.data.question);
+    const response = await answerAnalystQuestion(parsed.data.question, parsed.data.mode);
     return NextResponse.json(response);
   } catch (error) {
     console.error("[api/analyst] failed:", error);

@@ -8,9 +8,11 @@ import { getOrSetContextCache, invalidateContextCache } from "@/server/ai/contex
 import { ANALYST_SYSTEM_PROMPT } from "@/server/analyst/analyst-prompt";
 import type { EvidenceItem } from "@/components/domain/EvidencePopover";
 import { matchesTerm, buildEvidenceItem } from "@/domain/evidence-matcher";
+import { runAgenticRetrieval } from "./agentic-retriever";
 
 export const AnalystRequestSchema = z.object({
   question: z.string().trim().min(1).max(800),
+  mode: z.enum(["agentic", "rag", "compare"]).default("agentic"),
 });
 
 export type AnalystResponse = {
@@ -19,7 +21,20 @@ export type AnalystResponse = {
   sampleSize: number;
   evidence: EvidenceItem[];
   suggestedActions: string[];
+  metrics?: {
+    latencyMs: number;
+    tokenCount?: number;
+    mode: "agentic" | "rag";
+  };
 };
+
+export type ComparisonResult = {
+  mode: "compare";
+  agentic: AnalystResponse;
+  rag: AnalystResponse;
+};
+
+export type AnalystQueryResult = AnalystResponse | ComparisonResult;
 
 import { sanitizeTranscript } from "@/domain/sanitize-text";
 
@@ -247,15 +262,15 @@ type CachedResult = {
 };
 const queryCache = new Map<string, CachedResult>();
 
-export async function answerAnalystQuestion(question: string): Promise<AnalystResponse> {
-  const observations = await listObservations();
-  const fallback = heuristicAnswer(question, observations);
-  if (!hasLLM() || observations.length === 0) return fallback;
-
-  // 1. Check in-memory 0ms query cache
+export async function answerWithOneShotRAG(
+  question: string,
+  observations: Observation[],
+  fallback: AnalystResponse
+): Promise<AnalystResponse> {
+  const startTime = Date.now();
   const normalized = question.trim().toLowerCase();
   const fingerprint = `${observations.length}:${observations[0]?.createdAt ?? ""}`;
-  const cached = queryCache.get(normalized);
+  const cached = queryCache.get(`${normalized}:rag`);
   if (cached && cached.fingerprint === fingerprint && Date.now() - cached.timestamp < 15 * 60 * 1000) {
     return cached.response;
   }
@@ -366,14 +381,19 @@ export async function answerAnalystQuestion(question: string): Promise<AnalystRe
         terms
       );
 
+      const latencyMs = Date.now() - startTime;
       const finalResponse: AnalystResponse = {
         ...fallback,
         answer: cleanAnalystText(text),
         evidence: reconciledEvidence,
+        metrics: {
+          latencyMs,
+          mode: "rag",
+        },
       };
 
       // Store in 0ms query cache
-      queryCache.set(normalized, {
+      queryCache.set(`${normalized}:rag`, {
         fingerprint,
         response: finalResponse,
         timestamp: Date.now(),
@@ -387,5 +407,70 @@ export async function answerAnalystQuestion(question: string): Promise<AnalystRe
   }
 
   console.error("[analyst] All LLM models failed, serving grounded heuristic fallback:", lastError);
-  return fallback;
+  return {
+    ...fallback,
+    metrics: {
+      latencyMs: Date.now() - startTime,
+      mode: "rag",
+    },
+  };
+}
+
+export async function answerAnalystQuestion(
+  question: string,
+  mode: "agentic" | "rag" | "compare" = "agentic"
+): Promise<AnalystQueryResult> {
+  const observations = await listObservations();
+  const fallback = heuristicAnswer(question, observations);
+  if (!hasLLM() || observations.length === 0) {
+    if (mode === "compare") {
+      return {
+        mode: "compare",
+        agentic: { ...fallback, metrics: { latencyMs: 0, mode: "agentic" } },
+        rag: { ...fallback, metrics: { latencyMs: 0, mode: "rag" } },
+      };
+    }
+    return fallback;
+  }
+
+  if (mode === "compare") {
+    const [agenticRes, ragRes] = await Promise.allSettled([
+      runAgenticRetrieval(question, observations),
+      answerWithOneShotRAG(question, observations, fallback),
+    ]);
+
+    const agentic =
+      agenticRes.status === "fulfilled"
+        ? agenticRes.value
+        : {
+            ...fallback,
+            metrics: { latencyMs: 0, mode: "agentic" as const },
+          };
+
+    const rag =
+      ragRes.status === "fulfilled"
+        ? ragRes.value
+        : {
+            ...fallback,
+            metrics: { latencyMs: 0, mode: "rag" as const },
+          };
+
+    return {
+      mode: "compare",
+      agentic,
+      rag,
+    };
+  }
+
+  if (mode === "rag") {
+    return answerWithOneShotRAG(question, observations, fallback);
+  }
+
+  // Default: Agentic Retrieval with automatic fallback to RAG if tools fail
+  try {
+    return await runAgenticRetrieval(question, observations);
+  } catch (err) {
+    console.warn("[analyst] Agentic retrieval failed, falling back to One-Shot RAG:", err);
+    return answerWithOneShotRAG(question, observations, fallback);
+  }
 }
