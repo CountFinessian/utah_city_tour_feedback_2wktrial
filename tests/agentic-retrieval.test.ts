@@ -1,4 +1,4 @@
-﻿import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { POST as seedPOST } from "@/app/api/seed/route";
 import { listObservations } from "@/server/repositories/observations";
 import { createRetrievalTools } from "@/server/analyst/retrieval-tools";
@@ -65,5 +65,17 @@ describe("Agentic Retrieval & Tools", () => {
       expect(comparison.agentic.answer).toBeDefined();
       expect(comparison.rag.answer).toBeDefined();
     }
+  });
+
+  it("runAgenticRetrieval executes without crashing and returns formatted response", async () => {
+    const { runAgenticRetrieval } = await import("@/server/analyst/agentic-retriever");
+    const observations = await listObservations();
+    if (!process.env.GEMINI_API_KEY && !process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
+      expect(observations.length).toBeGreaterThan(0);
+      return;
+    }
+    const result = await runAgenticRetrieval("How many people talk about biking?", observations);
+    expect(result.answer).toBeDefined();
+    expect(result.metrics.mode).toBe("agentic");
   });
 });

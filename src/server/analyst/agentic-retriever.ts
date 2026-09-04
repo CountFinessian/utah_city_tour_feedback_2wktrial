@@ -9,9 +9,9 @@ import type { AnalystResponse } from "./analyst-service";
 const AGENTIC_SYSTEM_PROMPT = `You are the executive intelligence analyst for Utah City leadership.
 You answer strategic questions about captured resident tours and debriefs.
 
-CRITICAL OPERATING RULES:
-1. Dynamic Tool Usage: Never guess or hallucinate debrief data. Use your tools (searchDebriefs, getObservationDetails, queryAggregates, filterByResident) iteratively to gather exact facts before answering.
-2. If asked how many people discussed a topic, call searchDebriefs and explicitly count the unique matching debriefs.
+OPERATING WORKFLOW:
+1. Retrieval Step: When asked a question, call searchDebriefs, filterByResident, or queryAggregates ONCE to find matching debriefs.
+2. Immediate Answer: Once you have gathered the tool results, STOP calling tools and IMMEDIATELY write your final executive answer summarizing the findings. Do not make redundant tool calls.
 3. Clean Executive Voice: Write clean, decisive plain text. Never use markdown asterisks (no **bold** or *italic*), markdown headers (#), or bullet dashes. Use unicode bullets (• ) for lists.
 4. Attribution: In your answer, cite resident names directly (e.g., "Seth Robertson noted...").
 5. Citation Tag: At the very end of your final response, on a new line, append:
@@ -49,13 +49,13 @@ export async function runAgenticRetrieval(
         model,
         system: AGENTIC_SYSTEM_PROMPT,
         tools,
-        stopWhen: stepCountIs(4),
+        stopWhen: stepCountIs(5),
         prompt: question,
         temperature: 0.1,
       });
 
-      const timeoutPromise = new Promise<{ text: string; usage?: { totalTokens?: number } }>((_, reject) =>
-        setTimeout(() => reject(new Error("Agentic retrieval timeout")), 8000)
+      const timeoutPromise = new Promise<{ text: string; usage?: { totalTokens?: number }; steps?: any[] }>((_, reject) =>
+        setTimeout(() => reject(new Error("Agentic retrieval timeout")), 12000)
       );
 
       const res = await Promise.race([fetchPromise, timeoutPromise]);
@@ -63,8 +63,8 @@ export async function runAgenticRetrieval(
       const latencyMs = Date.now() - startTime;
       const tokenCount = res.usage?.totalTokens ?? 0;
 
-      const citedMatch = text.match(/CITED_OBSERVATIONS:\s*\[(.*?)\]/i);
       let citedIds: string[] = [];
+      const citedMatch = text.match(/CITED_OBSERVATIONS:\s*\[(.*?)\]/i);
       if (citedMatch) {
         citedIds = citedMatch[1]
           .split(",")
@@ -73,13 +73,33 @@ export async function runAgenticRetrieval(
         text = text.replace(/CITED_OBSERVATIONS:\s*\[.*?\]/i, "").trim();
       }
 
+      // Fallback: If text was not generated in the final step, extract answer from tool results
+      if (!text.trim() && res.steps) {
+        const foundHits: Array<{ id: string; resident?: string; excerpt: string }> = [];
+        for (const step of res.steps) {
+          for (const tr of step.toolResults || []) {
+            if (tr.output && typeof tr.output === "object") {
+              const out = tr.output as Record<string, any>;
+              if (Array.isArray(out.results)) foundHits.push(...out.results);
+              if (Array.isArray(out.matches)) foundHits.push(...out.matches);
+            }
+          }
+        }
+        if (foundHits.length > 0) {
+          const unique = Array.from(new Map(foundHits.map((h) => [h.id, h])).values());
+          text = `Based on captured resident debriefs, ${unique.length} observation${unique.length === 1 ? "" : "s"} discussed this topic:\n\n` +
+            unique.map((h) => `• ${h.resident}: ${h.excerpt}`).join("\n");
+          citedIds = unique.map((h) => h.id);
+        }
+      }
+
       const matchedObs = observations.filter((o) => citedIds.includes(o.id));
       const evidence = matchedObs.map((obs) => buildEvidenceItem(obs, [question]));
 
       const cleanedAnswer = cleanText(text);
 
       return {
-        answer: cleanedAnswer || "Analysis complete based on captured tour records.",
+        answer: cleanedAnswer || "No direct resident observations found matching this query.",
         confidence: observations.length < 5 ? "low" : observations.length < 15 ? "medium" : "high",
         sampleSize: observations.length,
         evidence,
