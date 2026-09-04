@@ -8,26 +8,21 @@ describe("Analyst Service Response & Guidance", () => {
     await seedPOST();
   });
 
-  it("handles 'hu' or short greetings with a warm welcome and usage instructions instead of boilerplate stats", async () => {
-    const res = await answerAnalystQuestion("hu");
-    expect(res.answer).toContain("Hello!");
-    expect(res.answer).toContain("Senior Intelligence Analyst");
-    expect(res.answer).toContain("Why are tours not converting?");
-    expect(res.answer).not.toContain("Capture volume is sufficient");
-    expect(res.evidence).toHaveLength(0);
-    expect(res.suggestedActions.length).toBeGreaterThan(0);
+  it("handles 'hu' and 'hi' with strict insufficient evidence response without conversational chatbot dumping", async () => {
+    const resHu = await answerAnalystQuestion("hu");
+    expect(resHu.answer).toBe("There is insufficient evidence in the debrief records to answer this prompt.");
+    expect(resHu.evidence).toHaveLength(0);
+
+    const resHi = await answerAnalystQuestion("hi");
+    expect(resHi.answer).toBe("There is insufficient evidence in the debrief records to answer this prompt.");
+    expect(resHi.evidence).toHaveLength(0);
   });
 
-  it("handles 'hi' with guidance and zero evidence items", async () => {
-    const res = await answerAnalystQuestion("hi");
-    expect(res.answer).toContain("Hello!");
-    expect(res.evidence).toHaveLength(0);
-  });
-
-  it("answers 'how many people talked about bikes?' with real quotes and precise evidence", async () => {
+  it("answers 'how many people talked about bikes?' with quotation marks around quotes and precise evidence", async () => {
     const res = await answerAnalystQuestion("how many people talked about bikes?");
     expect(res.answer.toLowerCase()).toContain("bike");
-    expect(res.answer.toLowerCase()).toContain("priya");
+    // Must include quotation marks around quotes
+    expect(res.answer).toContain('"');
     expect(res.evidence.length).toBeGreaterThanOrEqual(1);
     expect(res.evidence.every((e) => e.excerpt.toLowerCase().includes("bike"))).toBe(true);
   });

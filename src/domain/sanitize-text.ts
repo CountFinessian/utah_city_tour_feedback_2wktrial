@@ -29,3 +29,4 @@ export function sanitizeTranscript(text: string): string {
     .replace(/\uFFFD/g, "'")
     .trim();
 }
+
