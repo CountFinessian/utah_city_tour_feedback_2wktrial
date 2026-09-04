@@ -20,15 +20,18 @@ export type AnalystResponse = {
   suggestedActions: string[];
 };
 
+import { sanitizeTranscript } from "@/domain/sanitize-text";
+
 function cleanAnalystText(text: string): string {
-  return text
-    .replace(/^#{1,6}\s+/gm, "")
-    .replace(/^---+$/gm, "")
-    .replace(/\*{3,}/g, "")
-    .replace(/\*\*/g, "")
-    .replace(/^\s*[\*\-]\s+/gm, "• ")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
+  return sanitizeTranscript(
+    text
+      .replace(/^#{1,6}\s+/gm, "")
+      .replace(/^---+$/gm, "")
+      .replace(/\*{3,}/g, "")
+      .replace(/\*\*/g, "")
+      .replace(/^\s*[\*\-]\s+/gm, "• ")
+      .replace(/\n{3,}/g, "\n\n")
+  ).trim();
 }
 
 const STOP_WORDS = new Set([

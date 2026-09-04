@@ -20,12 +20,16 @@ async function writeAll(rows: Observation[]): Promise<void> {
   await fs.writeFile(FILE, JSON.stringify(rows, null, 2), "utf8");
 }
 
+import { sanitizeTranscript } from "@/domain/sanitize-text";
+
 export const fileObservationRepository: ObservationRepository = {
   async listObservations(): Promise<Observation[]> {
     try {
       const raw = await fs.readFile(FILE, "utf8");
       const rows = JSON.parse(raw) as Observation[];
-      return [...rows].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+      return rows
+        .map((r) => ({ ...r, transcript: sanitizeTranscript(r.transcript) }))
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
     } catch {
       return [];
     }

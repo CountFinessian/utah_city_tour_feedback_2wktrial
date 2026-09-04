@@ -52,6 +52,8 @@ type Row = {
   extraction: Extraction;
 };
 
+import { sanitizeTranscript } from "@/domain/sanitize-text";
+
 function toObservation(r: Row): Observation {
   return {
     id: r.id,
@@ -60,7 +62,7 @@ function toObservation(r: Row): Observation {
     hostName: r.host_name ?? undefined,
     floorPlan: r.floor_plan ?? undefined,
     prospectTag: r.prospect_tag ?? undefined,
-    transcript: r.transcript,
+    transcript: sanitizeTranscript(r.transcript),
     engine: r.engine === "llm" ? "llm" : "heuristic",
     extraction: r.extraction,
   };
