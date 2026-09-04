@@ -1,7 +1,7 @@
-﻿"use client";
+"use client";
 
 import { useState } from "react";
-import { Bot, Loader2, Send, Sparkles, Zap, BookOpen, Scale } from "lucide-react";
+import { Bot, Loader2, Send, Sparkles } from "lucide-react";
 import { ConfidenceBadge } from "./CommandComponents";
 import { EvidencePopover, type EvidenceItem } from "./EvidencePopover";
 
@@ -14,19 +14,12 @@ type AnalystResponse = {
   metrics?: {
     latencyMs: number;
     tokenCount?: number;
-    mode: "agentic" | "rag";
   };
-};
-
-type ComparisonResult = {
-  mode: "compare";
-  agentic: AnalystResponse;
-  rag: AnalystResponse;
 };
 
 type MessageItem = {
   question: string;
-  response: AnalystResponse | ComparisonResult;
+  response: AnalystResponse;
 };
 
 const prompts = [
@@ -38,7 +31,6 @@ const prompts = [
 
 export function AnalystConsole() {
   const [question, setQuestion] = useState("");
-  const [mode, setMode] = useState<"agentic" | "rag" | "compare">("agentic");
   const [messages, setMessages] = useState<MessageItem[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -53,7 +45,7 @@ export function AnalystConsole() {
       const res = await fetch("/api/analyst", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question: trimmed, mode }),
+        body: JSON.stringify({ question: trimmed }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Analyst failed.");
@@ -77,45 +69,6 @@ export function AnalystConsole() {
               <p className="command-label">AI Analyst</p>
               <h2 className="text-lg font-semibold text-command-ink">Ask the operational corpus</h2>
             </div>
-          </div>
-
-          <div className="flex items-center gap-1.5 rounded-[8px] border border-command-border bg-white/[0.02] p-1">
-            <button
-              type="button"
-              onClick={() => setMode("agentic")}
-              className={`flex items-center gap-1.5 rounded-[6px] px-2.5 py-1 text-xs font-semibold transition-all ${
-                mode === "agentic"
-                  ? "bg-command-accent/20 text-command-accent border border-command-accent/40 shadow-sm"
-                  : "text-command-soft hover:text-command-ink"
-              }`}
-            >
-              <Zap className="h-3.5 w-3.5" />
-              Agentic
-            </button>
-            <button
-              type="button"
-              onClick={() => setMode("rag")}
-              className={`flex items-center gap-1.5 rounded-[6px] px-2.5 py-1 text-xs font-semibold transition-all ${
-                mode === "rag"
-                  ? "bg-command-accent/20 text-command-accent border border-command-accent/40 shadow-sm"
-                  : "text-command-soft hover:text-command-ink"
-              }`}
-            >
-              <BookOpen className="h-3.5 w-3.5" />
-              One-Shot RAG
-            </button>
-            <button
-              type="button"
-              onClick={() => setMode("compare")}
-              className={`flex items-center gap-1.5 rounded-[6px] px-2.5 py-1 text-xs font-semibold transition-all ${
-                mode === "compare"
-                  ? "bg-amber-400/20 text-amber-300 border border-amber-400/40 shadow-sm"
-                  : "text-command-soft hover:text-command-ink"
-              }`}
-            >
-              <Scale className="h-3.5 w-3.5" />
-              Compare Both
-            </button>
           </div>
         </div>
 
@@ -144,13 +97,9 @@ export function AnalystConsole() {
             <div className="flex items-center justify-between text-xs text-command-soft">
               <span className="font-semibold text-command-accent flex items-center gap-2">
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                {mode === "compare"
-                  ? "Running Agentic & One-Shot RAG in parallel for comparison..."
-                  : mode === "agentic"
-                    ? "Executing Agentic Retrieval..."
-                    : "Querying with One-Shot RAG..."}
+                Synthesizing debrief corpus...
               </span>
-              <span className="text-command-muted text-[11px]">Benchmarking latency</span>
+              <span className="text-command-muted text-[11px]">One-Shot RAG</span>
             </div>
             <div className="relative h-1.5 w-full overflow-hidden rounded-full bg-command-border/40">
               <div className="h-full w-1/3 animate-[pulse_1.2s_ease-in-out_infinite] rounded-full bg-command-accent" />
@@ -164,117 +113,44 @@ export function AnalystConsole() {
               <Sparkles className="mx-auto h-8 w-8 text-command-accent" />
               <p className="mt-3 text-sm font-semibold text-command-ink">No analyst thread yet</p>
               <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-command-muted">
-                Ask a leadership question. Toggle between Agentic Retrieval and One-Shot RAG, or run them side-by-side to compare latency and accuracy.
+                Ask strategic questions about captured resident tours, pricing feedback, or amenity objections across 120 & 220 Bend.
               </p>
             </div>
           ) : (
             messages.map((message, index) => {
-              const isCompare = "mode" in message.response && message.response.mode === "compare";
-
-              if (isCompare) {
-                const comp = message.response as ComparisonResult;
-                return (
-                  <article key={`${message.question}-${index}`} className="analyst-message space-y-4">
-                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-command-border/50 pb-3">
-                      <p className="text-sm font-semibold text-command-accent">Q: {message.question}</p>
-                      <span className="rounded-[4px] border border-amber-400/40 bg-amber-500/10 px-2 py-0.5 text-xs font-bold text-amber-300">
-                        Side-by-Side Comparison
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                      {/* Agentic Card */}
-                      <div className="rounded-[8px] border border-command-accent/30 bg-command-panel/60 p-4 space-y-3">
-                        <div className="flex items-center justify-between border-b border-command-border/40 pb-2">
-                          <div className="flex items-center gap-1.5 text-xs font-bold text-command-accent">
-                            <Zap className="h-3.5 w-3.5" />
-                            Agentic Retrieval
-                          </div>
-                          {comp.agentic.metrics && (
-                            <span className="rounded bg-command-accent/15 px-2 py-0.5 text-xs font-semibold text-command-accent">
-                              {comp.agentic.metrics.latencyMs} ms
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-sm leading-relaxed text-command-ink whitespace-pre-wrap font-normal">
-                          {comp.agentic.answer}
-                        </div>
-                        <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-command-border/30">
-                          <ConfidenceBadge level={comp.agentic.confidence} sampleSize={comp.agentic.sampleSize} />
-                          {comp.agentic.evidence && comp.agentic.evidence.length > 0 && (
-                            <EvidencePopover count={comp.agentic.evidence.length} items={comp.agentic.evidence} />
-                          )}
-                        </div>
-                      </div>
-
-                      {/* RAG Card */}
-                      <div className="rounded-[8px] border border-command-border bg-command-panel/40 p-4 space-y-3">
-                        <div className="flex items-center justify-between border-b border-command-border/40 pb-2">
-                          <div className="flex items-center gap-1.5 text-xs font-bold text-command-soft">
-                            <BookOpen className="h-3.5 w-3.5" />
-                            One-Shot RAG
-                          </div>
-                          {comp.rag.metrics && (
-                            <span className="rounded bg-white/10 px-2 py-0.5 text-xs font-semibold text-command-soft">
-                              {comp.rag.metrics.latencyMs} ms
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-sm leading-relaxed text-command-ink whitespace-pre-wrap font-normal">
-                          {comp.rag.answer}
-                        </div>
-                        <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-command-border/30">
-                          <ConfidenceBadge level={comp.rag.confidence} sampleSize={comp.rag.sampleSize} />
-                          {comp.rag.evidence && comp.rag.evidence.length > 0 && (
-                            <EvidencePopover count={comp.rag.evidence.length} items={comp.rag.evidence} />
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </article>
-                );
-              }
-
-              const single = message.response as AnalystResponse;
-              const isAgentic = single.metrics?.mode === "agentic";
-
+              const item = message.response;
               return (
                 <article key={`${message.question}-${index}`} className="analyst-message">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <p className="text-sm font-semibold text-command-accent">Q: {message.question}</p>
-                    <div className="flex items-center gap-2">
-                      <span className={`rounded-[4px] px-2 py-0.5 text-xs font-semibold ${
-                        isAgentic
-                          ? "border border-command-accent/40 bg-command-accent/10 text-command-accent"
-                          : "border border-command-border bg-white/5 text-command-soft"
-                      }`}>
-                        {isAgentic ? "⚡ Agentic" : "📚 One-Shot RAG"}
+                    {item.metrics && (
+                      <span className="rounded bg-command-border/50 px-2 py-0.5 text-xs text-command-soft">
+                        {item.metrics.latencyMs} ms
                       </span>
-                      {single.metrics && (
-                        <span className="rounded bg-command-border/50 px-2 py-0.5 text-xs text-command-soft">
-                          {single.metrics.latencyMs} ms
-                        </span>
-                      )}
-                    </div>
+                    )}
                   </div>
 
                   <div className="mt-3 text-base leading-relaxed text-command-ink whitespace-pre-wrap font-normal">
-                    {single.answer}
+                    {item.answer}
                   </div>
+
                   <div className="mt-4 flex flex-wrap items-center gap-2">
-                    <ConfidenceBadge level={single.confidence} sampleSize={single.sampleSize} />
-                    {single.evidence && single.evidence.length > 0 && (
-                      <EvidencePopover count={single.evidence.length} items={single.evidence} />
+                    <ConfidenceBadge level={item.confidence} sampleSize={item.sampleSize} />
+                    {item.evidence && item.evidence.length > 0 && (
+                      <EvidencePopover count={item.evidence.length} items={item.evidence} />
                     )}
                   </div>
-                  <div className="mt-4 border-t border-command-border pt-4">
-                    <p className="command-label">Push to action</p>
-                    <ul className="mt-2 space-y-1 text-sm text-command-soft">
-                      {single.suggestedActions.map((action) => (
-                        <li key={action}>• {action}</li>
-                      ))}
-                    </ul>
-                  </div>
+
+                  {item.suggestedActions && item.suggestedActions.length > 0 && (
+                    <div className="mt-4 border-t border-command-border pt-4">
+                      <p className="command-label">Push to action</p>
+                      <ul className="mt-2 space-y-1 text-sm text-command-soft">
+                        {item.suggestedActions.map((action) => (
+                          <li key={action}>• {action}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </article>
               );
             })
@@ -300,9 +176,9 @@ export function AnalystConsole() {
         </section>
 
         <section className="command-panel">
-          <p className="command-label">Retrieval Architecture</p>
+          <p className="command-label">Operating Principles</p>
           <p className="mt-3 text-sm leading-relaxed text-command-soft">
-            <strong className="text-command-ink">Agentic Retrieval</strong> queries specific debriefs iteratively with precision tools. <strong className="text-command-ink">One-Shot RAG</strong> passes the full corpus snapshot into context. Compare side-by-side to benchmark latency and quality.
+            The AI Analyst performs single-pass executive synthesis over all captured resident tours and debriefs. Every claim is strictly grounded in verbatim quotes and attributed in the Evidence panel.
           </p>
         </section>
       </aside>

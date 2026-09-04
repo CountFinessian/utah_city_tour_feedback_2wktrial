@@ -8,11 +8,8 @@ import { getOrSetContextCache, invalidateContextCache } from "@/server/ai/contex
 import { ANALYST_SYSTEM_PROMPT } from "@/server/analyst/analyst-prompt";
 import type { EvidenceItem } from "@/components/domain/EvidencePopover";
 import { matchesTerm, buildEvidenceItem } from "@/domain/evidence-matcher";
-import { runAgenticRetrieval } from "./agentic-retriever";
-
 export const AnalystRequestSchema = z.object({
   question: z.string().trim().min(1).max(800),
-  mode: z.enum(["agentic", "rag", "compare"]).default("agentic"),
 });
 
 export type AnalystResponse = {
@@ -24,17 +21,10 @@ export type AnalystResponse = {
   metrics?: {
     latencyMs: number;
     tokenCount?: number;
-    mode: "agentic" | "rag";
   };
 };
 
-export type ComparisonResult = {
-  mode: "compare";
-  agentic: AnalystResponse;
-  rag: AnalystResponse;
-};
-
-export type AnalystQueryResult = AnalystResponse | ComparisonResult;
+export type AnalystQueryResult = AnalystResponse;
 
 import { sanitizeTranscript } from "@/domain/sanitize-text";
 
@@ -65,14 +55,6 @@ const STOP_WORDS = new Set([
   "corpus", "data", "lead", "leads", "feedback", "debrief", "debriefs", "record", "records",
   "please", "give", "show", "find", "look", "search", "check",
   "hi", "hu", "hello", "hey", "good", "morning", "afternoon", "evening", "help", "test",
-  "peiple", "peple", "ppl", "folks", "guy", "guys",
-  "put", "puts", "putting", "being", "been", "was", "were", "are", "is",
-  "will", "would", "shall", "should", "can", "could", "may", "might", "must",
-  "about", "into", "onto", "upon", "over", "under", "again", "further", "then", "once", "here",
-  "all", "any", "both", "each", "few", "more", "most", "other", "such",
-  "only", "own", "same", "than", "too", "very", "just", "now",
-  "like", "likes", "liked", "liking", "want", "wants", "wanted", "wanting",
-  "also", "well", "even", "really", "get", "gets", "getting", "got", "make", "makes", "making", "made"
 ]);
 
 const TOPIC_SYNONYMS: Record<string, string[]> = {
@@ -433,7 +415,6 @@ export async function answerWithOneShotRAG(
         evidence: resolvedEvidence,
         metrics: {
           latencyMs,
-          mode: "rag",
         },
       };
 
@@ -456,66 +437,18 @@ export async function answerWithOneShotRAG(
     ...fallback,
     metrics: {
       latencyMs: Date.now() - startTime,
-      mode: "rag",
     },
   };
 }
 
 export async function answerAnalystQuestion(
-  question: string,
-  mode: "agentic" | "rag" | "compare" = "agentic"
-): Promise<AnalystQueryResult> {
+  question: string
+): Promise<AnalystResponse> {
   const observations = await listObservations();
   const fallback = heuristicAnswer(question, observations);
   if (!hasLLM() || observations.length === 0) {
-    if (mode === "compare") {
-      return {
-        mode: "compare",
-        agentic: { ...fallback, metrics: { latencyMs: 0, mode: "agentic" } },
-        rag: { ...fallback, metrics: { latencyMs: 0, mode: "rag" } },
-      };
-    }
     return fallback;
   }
 
-  if (mode === "compare") {
-    const [agenticRes, ragRes] = await Promise.allSettled([
-      runAgenticRetrieval(question, observations),
-      answerWithOneShotRAG(question, observations, fallback),
-    ]);
-
-    const agentic =
-      agenticRes.status === "fulfilled"
-        ? agenticRes.value
-        : {
-            ...fallback,
-            metrics: { latencyMs: 0, mode: "agentic" as const },
-          };
-
-    const rag =
-      ragRes.status === "fulfilled"
-        ? ragRes.value
-        : {
-            ...fallback,
-            metrics: { latencyMs: 0, mode: "rag" as const },
-          };
-
-    return {
-      mode: "compare",
-      agentic,
-      rag,
-    };
-  }
-
-  if (mode === "rag") {
-    return answerWithOneShotRAG(question, observations, fallback);
-  }
-
-  // Default: Agentic Retrieval with automatic fallback to RAG if tools fail
-  try {
-    return await runAgenticRetrieval(question, observations);
-  } catch (err) {
-    console.warn("[analyst] Agentic retrieval failed, falling back to One-Shot RAG:", err);
-    return answerWithOneShotRAG(question, observations, fallback);
-  }
+  return answerWithOneShotRAG(question, observations, fallback);
 }

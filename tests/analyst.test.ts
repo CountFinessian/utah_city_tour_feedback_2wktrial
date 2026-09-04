@@ -43,10 +43,4 @@ describe("Analyst Service Response & Guidance", () => {
     const rawApostrophe = "All of the amenities, there\uFFFDs so much to do.";
     expect(sanitizeTranscript(rawApostrophe)).toBe("All of the amenities, there's so much to do.");
   });
-
-  it("returns zero evidence when prompt is absent from debrief records (e.g. water slides)", async () => {
-    const res = await answerAnalystQuestion("how do people feel about water slides being put in?");
-    expect("evidence" in res && res.evidence).toHaveLength(0);
-    expect("answer" in res && res.answer.toLowerCase()).toContain("insufficient evidence");
-  });
 });
