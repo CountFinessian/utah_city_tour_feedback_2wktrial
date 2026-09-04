@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { amenityLabel, objectionLabel, type Observation } from "@/domain/observation";
+import { extractCleanExcerpt } from "@/domain/evidence-matcher";
 
 function relativeTime(iso: string): string {
   const diff = Date.now() - Date.parse(iso);
@@ -9,19 +10,6 @@ function relativeTime(iso: string): string {
   if (days <= 0) return "today";
   if (days === 1) return "yesterday";
   return `${days} days ago`;
-}
-
-function excerptFor(transcript: string, terms: string[]): string {
-  const text = transcript.trim();
-  const normalized = text.toLowerCase();
-  const tokens = terms
-    .flatMap((term) => term.toLowerCase().split(/[^a-z0-9]+/))
-    .filter((term) => term.length >= 4);
-  const token = tokens.find((term) => normalized.includes(term));
-  const index = token ? normalized.indexOf(token) : 0;
-  const start = Math.max(0, index - 80);
-  const end = Math.min(text.length, index + 180);
-  return `${start > 0 ? "..." : ""}${text.slice(start, end)}${end < text.length ? "..." : ""}`;
 }
 
 export function KnowledgeExplorer({ observations }: { observations: Observation[] }) {
@@ -132,7 +120,7 @@ export function KnowledgeExplorer({ observations }: { observations: Observation[
                     <div>
                       <p className="text-sm font-semibold leading-relaxed">{e.summary}</p>
                       <p className="mt-2 text-sm leading-relaxed text-muted">
-                        {excerptFor(observation.transcript, [query, ...e.objections.map((obj) => obj.detail), ...e.amenities.map((item) => item.detail)])}
+                        {extractCleanExcerpt(observation.transcript, [query, ...e.objections.map((obj) => obj.detail), ...e.amenities.map((item) => item.detail)])}
                       </p>
                     </div>
                     <div className="text-xs text-muted">

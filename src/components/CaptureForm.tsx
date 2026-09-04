@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Recorder } from "./Recorder";
 import { amenityLabel, objectionLabel, type Observation } from "@/lib/ontology";
+import { extractCleanExcerpt } from "@/domain/evidence-matcher";
 
 type WorkflowState = "draft" | "structuring" | "review" | "follow_up" | "complete" | "failed";
 
@@ -44,23 +45,6 @@ const WORKFLOW_STEPS: { state: WorkflowState; label: string; helper: string }[] 
 
 function sentimentLabel(s: number): string {
   return ["Very negative", "Negative", "Neutral", "Positive", "Very positive"][s + 2] ?? "Neutral";
-}
-
-function excerptFor(transcript: string, candidates: string[]): string {
-  const text = transcript.trim();
-  if (!text) return "Transcript evidence available.";
-
-  const normalized = text.toLowerCase();
-  const terms = candidates
-    .flatMap((candidate) => candidate.toLowerCase().split(/[^a-z0-9]+/))
-    .filter((term) => term.length >= 4);
-  const match = terms.find((term) => normalized.includes(term));
-  const index = match ? normalized.indexOf(match) : 0;
-  const start = Math.max(0, index - 72);
-  const end = Math.min(text.length, index + 150);
-  const prefix = start > 0 ? "..." : "";
-  const suffix = end < text.length ? "..." : "";
-  return `${prefix}${text.slice(start, end)}${suffix}`;
 }
 
 function workflowRank(state: WorkflowState): number {
@@ -414,7 +398,7 @@ function IntelligenceReview({
           <div>
             <h2 className="text-xl font-bold text-foreground">Intelligence review</h2>
             <p className="mt-3 max-w-3xl text-[15px] leading-relaxed text-ink-soft">{e.summary}</p>
-            <div className="evidence-row mt-4">{excerptFor(observation.transcript, [e.summary])}</div>
+            <div className="evidence-row mt-4">{extractCleanExcerpt(observation.transcript, [e.summary])}</div>
           </div>
           <div>
             <div className="mb-2 flex items-center justify-between text-xs font-semibold text-muted">
@@ -442,7 +426,7 @@ function IntelligenceReview({
                     <span className={`pill capitalize ${SEVERITY_STYLE[o.severity]}`}>{o.severity}</span>
                   </div>
                   {o.detail ? <p className="mt-2 text-sm leading-relaxed text-muted">{o.detail}</p> : null}
-                  <div className="evidence-row mt-3">{excerptFor(observation.transcript, [o.detail, o.type])}</div>
+                  <div className="evidence-row mt-3">{extractCleanExcerpt(observation.transcript, [o.detail, o.type])}</div>
                 </article>
               ))}
             </div>
@@ -461,7 +445,7 @@ function IntelligenceReview({
                     <span className={`pill ${REACTION_STYLE[a.reaction]}`}>{a.reaction}</span>
                   </div>
                   {a.detail ? <p className="mt-2 text-sm leading-relaxed text-muted">{a.detail}</p> : null}
-                  <div className="evidence-row mt-3">{excerptFor(observation.transcript, [a.detail, a.name])}</div>
+                  <div className="evidence-row mt-3">{extractCleanExcerpt(observation.transcript, [a.detail, a.name])}</div>
                 </article>
               ))}
             </div>
@@ -480,7 +464,7 @@ function IntelligenceReview({
             ) : (
               <p className="text-sm text-muted">No lifestyle segment captured yet.</p>
             )}
-            <div className="evidence-row">{excerptFor(observation.transcript, [e.familyComposition ?? "", ...e.lifestyleSignals])}</div>
+            <div className="evidence-row">{extractCleanExcerpt(observation.transcript, [e.familyComposition ?? "", ...e.lifestyleSignals])}</div>
           </div>
         </ReviewSection>
 
@@ -492,7 +476,7 @@ function IntelligenceReview({
               {e.questionsAsked.map((q, i) => (
                 <li key={`${q}-${i}`} className="signal-card">
                   <p className="font-semibold">{q}</p>
-                  <div className="evidence-row mt-3">{excerptFor(observation.transcript, [q])}</div>
+                  <div className="evidence-row mt-3">{extractCleanExcerpt(observation.transcript, [q])}</div>
                 </li>
               ))}
             </ul>

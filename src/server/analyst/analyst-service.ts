@@ -7,6 +7,7 @@ import { buildDigest, buildNarrativeGuardrail } from "@/server/reporting/digest"
 import { getOrSetContextCache, invalidateContextCache } from "@/server/ai/context-cache";
 import { ANALYST_SYSTEM_PROMPT } from "@/server/analyst/analyst-prompt";
 import type { EvidenceItem } from "@/components/domain/EvidencePopover";
+import { matchesTerm, buildEvidenceItem } from "@/domain/evidence-matcher";
 
 export const AnalystRequestSchema = z.object({
   question: z.string().trim().min(1).max(800),
@@ -66,6 +67,13 @@ const TOPIC_SYNONYMS: Record<string, string[]> = {
   park: ["parks", "greenline", "grass"],
   parking: ["car", "cars", "garage", "spots"],
   pool: ["swim", "swimming"],
+  bathroom: ["bath", "baths", "bathrooms", "restroom", "restrooms"],
+  bath: ["bathroom", "bathrooms", "restroom", "restrooms"],
+  baths: ["bathroom", "bathrooms", "restroom", "restrooms"],
+  restroom: ["bathroom", "bathrooms", "restrooms", "bath"],
+  bedroom: ["bed", "beds", "bedrooms"],
+  bed: ["bedroom", "bedrooms"],
+  kitchen: ["kitchens", "appliances", "fridge", "oven"],
 };
 
 function isGreetingOrUnclear(question: string, terms: string[]): boolean {
@@ -78,40 +86,6 @@ function isGreetingOrUnclear(question: string, terms: string[]): boolean {
   if (greetings.includes(q) || q.length <= 3) return true;
   if (greetings.some((g) => q.startsWith(g) && q.length < g.length + 6)) return true;
   return terms.length === 0;
-}
-
-function matchesTerm(haystack: string, term: string): boolean {
-  if (haystack.includes(term)) return true;
-  if (term.endsWith("s") && term.length > 3 && haystack.includes(term.slice(0, -1))) return true;
-  if (!term.endsWith("s") && haystack.includes(`${term}s`)) return true;
-  return false;
-}
-
-function excerptFor(transcript: string, terms: string[]): string {
-  const text = transcript.trim();
-  if (!text) return "Transcript evidence unavailable.";
-
-  // Extract only the sentence(s) directly discussing the relevant topic
-  const sentences = text.match(/[^.!?]+[.!?]+/g) || [text];
-  const matching = sentences
-    .map((s) => s.trim())
-    .filter((s) => {
-      const sNorm = s.toLowerCase();
-      return terms.some((term) => matchesTerm(sNorm, term));
-    });
-
-  if (matching.length > 0) {
-    const quote = matching.slice(0, 2).join(" ");
-    return quote.startsWith('"') ? quote : `"${quote}"`;
-  }
-
-  const normalized = text.toLowerCase();
-  const token = terms.find((term) => matchesTerm(normalized, term));
-  const index = token ? normalized.indexOf(token) : 0;
-  const start = Math.max(0, index - 20);
-  const end = Math.min(text.length, index + 90);
-  const slice = text.slice(start, end).trim();
-  return `"${slice}"`;
 }
 
 function evidenceFor(observations: Observation[], terms: string[]): EvidenceItem[] {
@@ -137,17 +111,7 @@ function evidenceFor(observations: Observation[], terms: string[]): EvidenceItem
       return normalizedTerms.some((term) => matchesTerm(haystack, term));
     })
     .slice(0, 8)
-    .map((observation) => {
-      const residentName = observation.prospectTag
-        ? observation.prospectTag.replace(/\s*\([^)]*\)/, "").trim()
-        : observation.hostName;
-      return {
-        id: observation.id,
-        label: observation.extraction.summary || "Observation",
-        excerpt: excerptFor(observation.transcript, normalizedTerms),
-        meta: [residentName, observation.floorPlan, observation.source].filter(Boolean).join(" · "),
-      };
-    });
+    .map((observation) => buildEvidenceItem(observation, normalizedTerms));
 }
 
 function reconcileEvidenceWithAnswer(
@@ -177,12 +141,10 @@ function reconcileEvidenceWithAnswer(
     });
 
     if (nameMatch || quoteMatch) {
-      evidenceMap.set(obs.id, {
-        id: obs.id,
-        label: obs.extraction.summary || "Observation",
-        excerpt: excerptFor(obs.transcript, terms.length > 0 ? terms : [cleanName.toLowerCase()]),
-        meta: [cleanName || obs.hostName, obs.floorPlan, obs.source].filter(Boolean).join(" · "),
-      });
+      evidenceMap.set(
+        obs.id,
+        buildEvidenceItem(obs, terms.length > 0 ? terms : [cleanName.toLowerCase()])
+      );
     }
   }
 
@@ -391,18 +353,9 @@ export async function answerAnalystQuestion(question: string): Promise<AnalystRe
 
         const matchedObs = observations.filter((o) => citedIds.includes(o.id));
         if (matchedObs.length > 0) {
-          resolvedEvidence = matchedObs.map((obs) => ({
-            id: obs.id,
-            label: obs.extraction.summary || "Observation",
-            excerpt: excerptFor(obs.transcript, terms.length > 0 ? terms : [question]),
-            meta: [
-              obs.prospectTag?.replace(/\s*\([^)]*\)/, "").trim() || obs.hostName,
-              obs.floorPlan,
-              obs.source,
-            ]
-              .filter(Boolean)
-              .join(" · "),
-          }));
+          resolvedEvidence = matchedObs.map((obs) =>
+            buildEvidenceItem(obs, terms.length > 0 ? terms : [question])
+          );
         }
       }
 

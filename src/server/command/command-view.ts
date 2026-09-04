@@ -3,33 +3,15 @@ import { buildCommandCenter } from "@/server/intelligence/command-center";
 import { listObservations } from "@/server/repositories/observations";
 import { buildDigest, buildNarrativeGuardrail, templateNarrative } from "@/server/reporting/digest";
 import type { EvidenceItem } from "@/components/domain/EvidencePopover";
+import { buildEvidenceItem } from "@/domain/evidence-matcher";
 
 const DAY = 24 * 60 * 60 * 1000;
-
-function excerptFor(transcript: string, candidates: string[]): string {
-  const text = transcript.trim();
-  if (!text) return "Transcript evidence unavailable.";
-  const normalized = text.toLowerCase();
-  const terms = candidates
-    .flatMap((candidate) => candidate.toLowerCase().split(/[^a-z0-9]+/))
-    .filter((term) => term.length >= 4);
-  const match = terms.find((term) => normalized.includes(term));
-  const index = match ? normalized.indexOf(match) : 0;
-  const start = Math.max(0, index - 80);
-  const end = Math.min(text.length, index + 190);
-  return `${start > 0 ? "..." : ""}${text.slice(start, end)}${end < text.length ? "..." : ""}`;
-}
 
 function evidenceFrom(observations: Observation[], filter: (observation: Observation) => boolean, terms: string[]): EvidenceItem[] {
   return observations
     .filter(filter)
     .slice(0, 6)
-    .map((observation) => ({
-      id: observation.id,
-      label: observation.extraction.summary || observation.prospectTag || "Captured observation",
-      excerpt: excerptFor(observation.transcript, terms),
-      meta: [observation.hostName, observation.floorPlan, observation.source].filter(Boolean).join(" · "),
-    }));
+    .map((observation) => buildEvidenceItem(observation, terms));
 }
 
 function avg(nums: number[]): number | null {
