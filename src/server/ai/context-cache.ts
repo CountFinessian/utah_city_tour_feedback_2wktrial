@@ -75,6 +75,13 @@ export async function getOrSetContextCache(
       body: JSON.stringify({
         model: "models/gemini-flash-latest",
         displayName: `utah-city-corpus-${currentFingerprint}`,
+        systemInstruction: {
+          parts: [
+            {
+              text: "You are Utah City's Senior Intelligence Analyst for 120 & 220 Bend. You provide fast, direct, grounded, and concise executive analysis based on resident tour debriefs. Cite exact names, direct quotes, and specific numbers in clean plain text with no asterisks.",
+            },
+          ],
+        },
         contents: [
           {
             role: "user",
@@ -104,3 +111,8 @@ export async function getOrSetContextCache(
     return null;
   }
 }
+
+export function invalidateContextCache(): void {
+  activeCache = null;
+}
+

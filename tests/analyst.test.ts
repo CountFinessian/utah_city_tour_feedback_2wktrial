@@ -23,10 +23,19 @@ describe("Analyst Service Response & Guidance", () => {
     expect(res.evidence).toHaveLength(0);
   });
 
+  it("answers 'how many people talked about bikes?' with real quotes and precise evidence", async () => {
+    const res = await answerAnalystQuestion("how many people talked about bikes?");
+    // Must mention bike and quote real resident
+    expect(res.answer.toLowerCase()).toContain("bike");
+    expect(res.answer.toLowerCase()).toContain("priya");
+    // Evidence must only include debriefs actually mentioning bikes (not 4 random ones!)
+    expect(res.evidence.length).toBeGreaterThanOrEqual(1);
+    expect(res.evidence.every((e) => e.excerpt.toLowerCase().includes("bike"))).toBe(true);
+  });
+
   it("does not output markdown asterisks in answer", async () => {
     const res = await answerAnalystQuestion("parking");
     expect(res.answer).not.toMatch(/\*\*/);
     expect(res.answer).not.toMatch(/\*{3,}/);
   });
 });
-

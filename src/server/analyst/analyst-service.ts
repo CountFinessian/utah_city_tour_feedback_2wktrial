@@ -4,7 +4,8 @@ import type { Observation } from "@/domain/observation";
 import { GOOGLE_MODELS, getGoogleModel, hasGoogleKey, hasLLM, llmModel } from "@/server/ai/model-config";
 import { listObservations } from "@/server/repositories/observations";
 import { buildDigest, buildNarrativeGuardrail } from "@/server/reporting/digest";
-import { getOrSetContextCache } from "@/server/ai/context-cache";
+import { getOrSetContextCache, invalidateContextCache } from "@/server/ai/context-cache";
+import { ANALYST_SYSTEM_PROMPT } from "@/server/analyst/analyst-prompt";
 import type { EvidenceItem } from "@/components/domain/EvidencePopover";
 
 export const AnalystRequestSchema = z.object({
@@ -30,8 +31,21 @@ function cleanAnalystText(text: string): string {
     .trim();
 }
 
-const GREETING_WORDS = new Set([
-  "hi", "hu", "hello", "hey", "hola", "yo", "sup", "howdy", "good", "morning", "afternoon", "evening", "there", "what", "tell", "about", "me", "the", "are", "you", "who", "can", "how", "please", "some", "with", "help", "test"
+const STOP_WORDS = new Set([
+  "how", "many", "much", "people", "person", "someone", "anyone", "everybody", "everyone",
+  "talk", "talks", "talked", "talking", "say", "says", "said", "saying",
+  "tell", "tells", "told", "telling", "mention", "mentions", "mentioned", "mentioning",
+  "discuss", "discusses", "discussed", "discussing", "ask", "asks", "asked", "asking",
+  "think", "thinks", "thought", "feel", "feels", "felt", "hear", "heard",
+  "what", "which", "when", "where", "who", "whom", "whose", "why",
+  "there", "their", "theirs", "they", "them", "some", "with", "from", "that", "this", "these", "those",
+  "have", "has", "had", "having", "been", "were", "was", "will", "would", "could", "should", "can",
+  "does", "do", "did", "doing", "done", "are", "you", "your", "yours", "our", "ours", "my", "mine",
+  "about", "into", "over", "after", "before", "between", "under", "again", "further",
+  "resident", "residents", "prospect", "prospects", "tour", "tours", "visitor", "visitors",
+  "corpus", "data", "lead", "leads", "feedback", "debrief", "debriefs", "record", "records",
+  "please", "give", "show", "find", "look", "search", "check",
+  "hi", "hu", "hello", "hey", "good", "morning", "afternoon", "evening", "help", "test"
 ]);
 
 function isGreetingOrUnclear(question: string, terms: string[]): boolean {
@@ -46,14 +60,18 @@ function isGreetingOrUnclear(question: string, terms: string[]): boolean {
   return terms.length === 0;
 }
 
+function matchesTerm(haystack: string, term: string): boolean {
+  if (haystack.includes(term)) return true;
+  if (term.endsWith("s") && term.length > 3 && haystack.includes(term.slice(0, -1))) return true;
+  if (!term.endsWith("s") && haystack.includes(`${term}s`)) return true;
+  return false;
+}
+
 function excerptFor(transcript: string, terms: string[]): string {
   const text = transcript.trim();
   if (!text) return "Transcript evidence unavailable.";
   const normalized = text.toLowerCase();
-  const tokens = terms
-    .flatMap((term) => term.toLowerCase().split(/[^a-z0-9]+/))
-    .filter((term) => term.length >= 4 && !GREETING_WORDS.has(term));
-  const token = tokens.find((term) => normalized.includes(term));
+  const token = terms.find((term) => matchesTerm(normalized, term));
   const index = token ? normalized.indexOf(token) : 0;
   const start = Math.max(0, index - 90);
   const end = Math.min(text.length, index + 220);
@@ -63,7 +81,7 @@ function excerptFor(transcript: string, terms: string[]): string {
 function evidenceFor(observations: Observation[], terms: string[]): EvidenceItem[] {
   const normalizedTerms = terms
     .map((term) => term.toLowerCase().trim())
-    .filter((t) => t.length >= 3 && !GREETING_WORDS.has(t));
+    .filter((t) => t.length >= 3 && !STOP_WORDS.has(t));
 
   if (normalizedTerms.length === 0) return [];
 
@@ -78,13 +96,13 @@ function evidenceFor(observations: Observation[], terms: string[]): EvidenceItem
       ]
         .join(" ")
         .toLowerCase();
-      return normalizedTerms.some((term) => haystack.includes(term));
+      return normalizedTerms.some((term) => matchesTerm(haystack, term));
     })
     .slice(0, 5)
     .map((observation) => ({
       id: observation.id,
       label: observation.extraction.summary || "Observation",
-      excerpt: excerptFor(observation.transcript, terms),
+      excerpt: excerptFor(observation.transcript, normalizedTerms),
       meta: [observation.hostName, observation.floorPlan, observation.source].filter(Boolean).join(" · "),
     }));
 }
@@ -93,8 +111,9 @@ function keywordTerms(question: string): string[] {
   return question
     .toLowerCase()
     .split(/[^a-z0-9]+/)
-    .filter((term) => term.length >= 3 && !GREETING_WORDS.has(term))
-    .slice(0, 12);
+    .map((term) => term.trim())
+    .filter((term) => term.length >= 3 && !STOP_WORDS.has(term))
+    .slice(0, 10);
 }
 
 function heuristicAnswer(question: string, observations: Observation[]): AnalystResponse {
@@ -124,7 +143,16 @@ function heuristicAnswer(question: string, observations: Observation[]): Analyst
   }
 
   let answer: string;
-  if (q.includes("parking") || q.includes("objection")) {
+  if (terms.length > 0 && evidence.length > 0) {
+    const topic = terms.join(", ");
+    const count = evidence.length;
+    answer =
+      `Based on the captured debriefs, ${count} resident observation${count === 1 ? "" : "s"} mentioned ${topic}:\n` +
+      evidence.map((e) => `• ${e.meta}: "${e.excerpt}"`).join("\n");
+  } else if (terms.length > 0 && evidence.length === 0) {
+    const topic = terms.join(", ");
+    answer = `No residents or tour debriefs mentioned "${topic}" across the 16 recorded debriefs for 120 & 220 Bend.`;
+  } else if (q.includes("parking") || q.includes("objection")) {
     const parking = digest.topObjections.find((item) => item.type === "parking");
     const top = digest.topObjections[0];
     answer = parking
@@ -220,35 +248,49 @@ export async function answerAnalystQuestion(question: string): Promise<AnalystRe
   let lastError: unknown = null;
   for (const model of modelsToTry) {
     try {
-      const fetchPromise = generateText({
-        model,
-        temperature: 0.1,
-        maxRetries: 0,
-        system: `You are Utah City's Senior Intelligence Analyst. You provide fast, direct, and concise executive analysis based on resident debriefs from 120 & 220 Bend.
+      let text = "";
 
-Rules:
-1. Be fast, direct, and concise. Keep responses under 130-160 words with quick, readable bullet points using '• '. Avoid filler or long essays.
-2. DO NOT use markdown asterisks (**) anywhere. Do NOT wrap names or titles in asterisks. Write clean, natural plain text.
-3. Cite resident names directly in plain text (e.g., Spencer Nelson flagged..., Zjanya Arwood noted...).
-4. If the user sends a greeting, typo, or brief/unclear input (e.g., "hi", "hu", "hello", "hey", "help"), reply warmly in 2-3 short sentences: introduce yourself as Utah City's Senior Intelligence Analyst for 120 & 220 Bend, explain what you analyze, and give clear instructions on what to ask (e.g., asking why tours aren't converting, how residents feel about amenities, or recurring objections like parking). Do not dump raw metrics.
-5. If a topic is not in the records (e.g., parking), state directly in 1-2 sentences that no residents have mentioned concerns about that topic across the 16 recorded debriefs.`,
-        prompt: contextCacheName ? `Question: ${question}` : JSON.stringify(payload, null, 2),
-        ...(contextCacheName
-          ? {
-              providerOptions: {
-                google: {
-                  cachedContent: contextCacheName,
-                },
+      // Attempt 1: Context cached generation (no systemInstruction in generateText call)
+      if (contextCacheName) {
+        try {
+          const fetchPromise = generateText({
+            model,
+            temperature: 0.1,
+            maxRetries: 0,
+            prompt: `User Question: ${question}\n\nAnswer directly from the debrief corpus. If asked "how many people", count the debriefs explicitly. Cite real resident names, quote their specific feedback, and write clean plain text with no asterisks.`,
+            providerOptions: {
+              google: {
+                cachedContent: contextCacheName,
               },
-            }
-          : {}),
-      });
+            },
+          });
+          const timeoutPromise = new Promise<{ text: string }>((_, reject) =>
+            setTimeout(() => reject(new Error("Context cache model timeout")), 5000)
+          );
+          const res = await Promise.race([fetchPromise, timeoutPromise]);
+          text = res.text;
+        } catch (cacheErr) {
+          console.warn("[analyst] Context cache failed, invalidating and falling back to direct prompt payload:", cacheErr instanceof Error ? cacheErr.message : cacheErr);
+          invalidateContextCache();
+        }
+      }
 
-      const timeoutPromise = new Promise<{ text: string }>((_, reject) =>
-        setTimeout(() => reject(new Error("Model response timeout")), 6000)
-      );
+      // Attempt 2: Standard direct generation with full observation payload
+      if (!text) {
+        const fetchPromise = generateText({
+          model,
+          temperature: 0.1,
+          maxRetries: 0,
+          system: ANALYST_SYSTEM_PROMPT,
+          prompt: JSON.stringify(payload, null, 2),
+        });
+        const timeoutPromise = new Promise<{ text: string }>((_, reject) =>
+          setTimeout(() => reject(new Error("Standard model response timeout")), 6000)
+        );
+        const res = await Promise.race([fetchPromise, timeoutPromise]);
+        text = res.text;
+      }
 
-      const { text } = await Promise.race([fetchPromise, timeoutPromise]);
       const finalResponse: AnalystResponse = {
         ...fallback,
         answer: cleanAnalystText(text),
@@ -265,7 +307,7 @@ Rules:
       return finalResponse;
     } catch (err) {
       lastError = err;
-      console.warn("[analyst] Model failed or timed out, trying next fallback model...", err instanceof Error ? err.message : err);
+      console.warn("[analyst] Model failed, trying next fallback model...", err instanceof Error ? err.message : err);
     }
   }
 
