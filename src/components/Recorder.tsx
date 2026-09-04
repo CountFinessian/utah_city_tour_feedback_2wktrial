@@ -30,28 +30,6 @@ export function Recorder({
     timerRef.current = null;
   }
 
-  const NOISE_PHRASES = [
-    "uh oh",
-    "uhoh",
-    "one two three go",
-    "1 2 3 go",
-    "one two three",
-    "thank you",
-    "thanks",
-    "bye",
-    "goodbye",
-    "you",
-    "silence",
-    "empty",
-    "subtitles",
-  ];
-
-  function isNoiseOrHallucination(text: string): boolean {
-    const clean = text.toLowerCase().replace(/[^a-z0-9\s]/g, " ").trim();
-    if (!clean || clean.length < 4) return true;
-    return NOISE_PHRASES.some((phrase) => clean === phrase || clean.startsWith(`${phrase} `));
-  }
-
   async function start() {
     setNote(null);
     if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
@@ -111,7 +89,7 @@ export function Recorder({
         const res = await fetch("/api/transcribe", { method: "POST", body: fd });
         const json = await res.json();
         const text = (json.text as string | undefined)?.trim();
-        if (text && !isNoiseOrHallucination(text)) {
+        if (text) {
           onText(text);
           setPhase("idle");
           return;
@@ -146,7 +124,7 @@ export function Recorder({
         }
       });
       const trimmed = text?.trim();
-      if (trimmed && !isNoiseOrHallucination(trimmed)) {
+      if (trimmed) {
         onText(trimmed);
       } else {
         setNote("No speech detected — speak clearly or type below.");
