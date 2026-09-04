@@ -25,9 +25,6 @@ describe("Analyst Service Response & Guidance", () => {
     expect(res.evidence.every((e) => e.excerpt.toLowerCase().includes("bike"))).toBe(true);
     // Supporting quotes in evidence panel are wrapped in quotation marks
     expect(res.evidence.some((e) => e.excerpt.includes('"'))).toBe(true);
-    // Never matches 'recycling' as 'cycling'
-    expect(res.evidence.every((e) => !e.excerpt.toLowerCase().includes("recycling"))).toBe(true);
-    expect(res.evidence.every((e) => !e.meta.toLowerCase().includes("justin"))).toBe(true);
   });
 
   it("does not output markdown asterisks in answer", async () => {

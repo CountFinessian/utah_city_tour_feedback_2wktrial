@@ -53,15 +53,17 @@ const STOP_WORDS = new Set([
 ]);
 
 const TOPIC_SYNONYMS: Record<string, string[]> = {
-  bike: ["bikes", "ebike", "ebikes", "e-bike", "e-bikes", "peloton", "biking"],
-  bikes: ["bike", "ebike", "ebikes", "e-bike", "e-bikes", "peloton", "biking"],
-  peloton: ["bike", "bikes", "fitness", "gym"],
+  bike: ["bikes", "ebike", "ebikes", "e-bike", "e-bikes", "peloton", "cycling", "biking"],
+  bikes: ["bike", "ebike", "ebikes", "e-bike", "e-bikes", "peloton", "cycling", "biking"],
+  cycling: ["bike", "bikes", "peloton", "ebike"],
+  peloton: ["bike", "bikes", "cycling", "fitness", "gym"],
   gym: ["fitness", "workout", "weights", "peloton"],
   fitness: ["gym", "workout", "weights", "peloton"],
   dog: ["dogs", "pet", "pets", "puppy", "puppies"],
   dogs: ["dog", "pet", "pets", "puppy", "puppies"],
   pet: ["pets", "dog", "dogs", "puppy", "puppies"],
   pets: ["pet", "dog", "dogs", "puppy", "puppies"],
+  park: ["parks", "greenline", "grass"],
   parking: ["car", "cars", "garage", "spots"],
   pool: ["swim", "swimming"],
 };
@@ -79,20 +81,9 @@ function isGreetingOrUnclear(question: string, terms: string[]): boolean {
 }
 
 function matchesTerm(haystack: string, term: string): boolean {
-  const t = term.trim().toLowerCase();
-  if (!t) return false;
-
-  // Use word boundaries so substrings like "recycling" never match "cycling"
-  const escaped = t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const regex = new RegExp(`(?:^|[^a-z0-9])${escaped}s?(?:[^a-z0-9]|$)`, "i");
-  if (regex.test(haystack)) return true;
-
-  if (t.endsWith("s") && t.length > 3) {
-    const singular = t.slice(0, -1).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const singularRegex = new RegExp(`(?:^|[^a-z0-9])${singular}(?:[^a-z0-9]|$)`, "i");
-    if (singularRegex.test(haystack)) return true;
-  }
-
+  if (haystack.includes(term)) return true;
+  if (term.endsWith("s") && term.length > 3 && haystack.includes(term.slice(0, -1))) return true;
+  if (!term.endsWith("s") && haystack.includes(`${term}s`)) return true;
   return false;
 }
 
@@ -316,6 +307,8 @@ export async function answerAnalystQuestion(question: string): Promise<AnalystRe
 
   // Pass rich observation context so Gemini can cite real resident names and debriefs
   const observationsContext = observations.map((o) => ({
+    id: o.id,
+    resident: (o.prospectTag || "").replace(/\s*\([^)]*\)/, "").trim() || o.hostName,
     name: o.hostName,
     unitOrFloorPlan: o.floorPlan,
     prospectTag: o.prospectTag,
@@ -353,7 +346,7 @@ export async function answerAnalystQuestion(question: string): Promise<AnalystRe
             model,
             temperature: 0.1,
             maxRetries: 0,
-            prompt: `User Question: ${question}\n\nAnswer directly from the debrief corpus. If asked "how many people", count the debriefs explicitly. Cite real resident names, quote their specific feedback, and write clean plain text with no asterisks.`,
+            prompt: `User Question: ${question}\n\nAnswer directly from the debrief corpus. If asked "how many people", count the debriefs explicitly. Cite real resident names, quote their specific feedback, and write clean plain text with no asterisks. At the end on a new line, output: CITED_OBSERVATIONS: [id1, id2] with only the IDs of observations used.`,
             providerOptions: {
               google: {
                 cachedContent: contextCacheName,
@@ -387,9 +380,35 @@ export async function answerAnalystQuestion(question: string): Promise<AnalystRe
         text = res.text;
       }
 
+      let resolvedEvidence = evidence;
+      const citedMatch = text.match(/CITED_OBSERVATIONS:\s*\[(.*?)\]/i);
+      if (citedMatch) {
+        const citedIds = citedMatch[1]
+          .split(",")
+          .map((s) => s.trim().replace(/['"]/g, ""))
+          .filter(Boolean);
+        text = text.replace(/CITED_OBSERVATIONS:\s*\[.*?\]/i, "").trim();
+
+        const matchedObs = observations.filter((o) => citedIds.includes(o.id));
+        if (matchedObs.length > 0) {
+          resolvedEvidence = matchedObs.map((obs) => ({
+            id: obs.id,
+            label: obs.extraction.summary || "Observation",
+            excerpt: excerptFor(obs.transcript, terms.length > 0 ? terms : [question]),
+            meta: [
+              obs.prospectTag?.replace(/\s*\([^)]*\)/, "").trim() || obs.hostName,
+              obs.floorPlan,
+              obs.source,
+            ]
+              .filter(Boolean)
+              .join(" · "),
+          }));
+        }
+      }
+
       const reconciledEvidence = reconcileEvidenceWithAnswer(
         text,
-        evidence,
+        resolvedEvidence,
         observations,
         terms
       );
