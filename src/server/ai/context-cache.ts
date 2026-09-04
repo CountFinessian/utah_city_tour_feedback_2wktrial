@@ -68,6 +68,13 @@ export async function getOrSetContextCache(
 
   const corpusText = formatCorpusForCache(observations, digest);
 
+  // Google Gemini Context Cache strictly requires at least 32,768 tokens (~130,000 chars).
+  // For corpora under 32k tokens, skip the API call to save latency and avoid 400 Bad Request errors.
+  const estimatedTokens = Math.ceil(corpusText.length / 4);
+  if (estimatedTokens < 32_768) {
+    return null;
+  }
+
   try {
     const url = `https://generativelanguage.googleapis.com/v1beta/cachedContents?key=${apiKey}`;
     const res = await fetch(url, {
