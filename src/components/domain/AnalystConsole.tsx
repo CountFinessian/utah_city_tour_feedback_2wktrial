@@ -111,8 +111,11 @@ export function AnalystConsole() {
               </span>
               <span className="font-mono text-[11px] text-command-muted">Gemini RAG active</span>
             </div>
-            <div className="mt-3 relative h-1.5 w-full overflow-hidden rounded-full bg-white/10">
-              <div className="analyst-loading-bar rounded-full" />
+            <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-command-accent via-emerald-400 to-sky-400 transition-all duration-500"
+                style={{ width: `${Math.min(95, (loadingStep + 1) * 32)}%` }}
+              />
             </div>
           </div>
         )}

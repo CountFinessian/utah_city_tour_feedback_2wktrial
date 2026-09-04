@@ -162,13 +162,13 @@ Rules:
 1. Be fast, direct, and concise. Keep responses under 130-160 words with quick, readable bullet points. Avoid filler or long essays.
 2. DO NOT use canned boilerplate phrases like "Capture volume is sufficient...".
 3. Cite resident names directly when sharing feedback (e.g., "**Spencer Nelson** flagged...", "**Zjanya Arwood** noted...").
-4. If the user sends a greeting (e.g., "hi", "hello"), reply in 2 friendly sentences explaining what you analyze and suggest 2 topics to ask about.
+4. If the user ONLY sends a greeting with no topic (e.g. just "hi" or "hello"), reply in 2 friendly sentences explaining what you analyze and suggest 2 topics to ask about. If they ask about a topic (such as amenities, parking, or safety), directly answer their question with debrief findings.
 5. If a topic is not in the records (e.g., parking), state directly in 1-2 sentences that no residents have mentioned concerns about that topic across the 16 recorded debriefs.`,
         prompt: JSON.stringify(payload, null, 2),
       });
 
       const timeoutPromise = new Promise<{ text: string }>((_, reject) =>
-        setTimeout(() => reject(new Error("Model response timeout")), 4500)
+        setTimeout(() => reject(new Error("Model response timeout")), 3000)
       );
 
       const { text } = await Promise.race([fetchPromise, timeoutPromise]);
@@ -183,9 +183,6 @@ Rules:
     }
   }
 
-  console.error("[analyst] All LLM models failed:", lastError);
-  return {
-    ...fallback,
-    answer: "⚠️ Google AI rate limit or quota reached on the free tier. Please wait 30 seconds before submitting another question, or add a billing method in Google AI Studio to unlock unlimited requests.",
-  };
+  console.error("[analyst] All LLM models failed, serving grounded heuristic fallback:", lastError);
+  return fallback;
 }
