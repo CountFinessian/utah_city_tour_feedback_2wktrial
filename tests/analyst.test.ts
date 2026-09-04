@@ -29,3 +29,4 @@ describe("Analyst Service Response & Guidance", () => {
     expect(res.answer).not.toMatch(/\*{3,}/);
   });
 });
+
