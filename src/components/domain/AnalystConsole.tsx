@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Bot, Send, Sparkles } from "lucide-react";
+import { useState } from "react";
+import { Bot, Loader2, Send, Sparkles } from "lucide-react";
 import { ConfidenceBadge } from "./CommandComponents";
 import { EvidencePopover, type EvidenceItem } from "./EvidencePopover";
 
@@ -20,29 +20,11 @@ const prompts = [
   "What should leadership focus on this week?",
 ];
 
-const LOADING_STEPS = [
-  "Searching 16 resident feedback records...",
-  "Extracting grounded quotes and signals...",
-  "Synthesizing executive brief with Gemini...",
-];
-
 export function AnalystConsole() {
   const [question, setQuestion] = useState("");
   const [messages, setMessages] = useState<{ question: string; response: AnalystResponse }[]>([]);
   const [busy, setBusy] = useState(false);
-  const [loadingStep, setLoadingStep] = useState(0);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!busy) {
-      setLoadingStep(0);
-      return;
-    }
-    const timer = setInterval(() => {
-      setLoadingStep((s) => (s + 1) % LOADING_STEPS.length);
-    }, 1100);
-    return () => clearInterval(timer);
-  }, [busy]);
 
   async function ask(nextQuestion = question) {
     const trimmed = nextQuestion.trim();
@@ -93,30 +75,16 @@ export function AnalystConsole() {
             className="analyst-input"
           />
           <button type="submit" disabled={busy || !question.trim()} className="btn btn-primary px-4 disabled:opacity-50">
-            <Send className="h-4 w-4" />
+            {busy ? <Loader2 className="h-4 w-4 animate-spin text-white" /> : <Send className="h-4 w-4" />}
           </button>
         </form>
 
         {error && <p className="mt-3 rounded-[8px] border border-red-400/40 bg-red-500/10 px-3 py-2 text-sm text-red-200">{error}</p>}
 
         {busy && (
-          <div className="mt-4 rounded-[12px] border border-command-accent/30 bg-command-accent/5 p-4 animate-in fade-in">
-            <div className="flex items-center justify-between text-xs font-semibold text-command-accent">
-              <span className="flex items-center gap-2">
-                <span className="relative flex h-2.5 w-2.5">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-command-accent opacity-75" />
-                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-command-accent" />
-                </span>
-                {LOADING_STEPS[loadingStep]}
-              </span>
-              <span className="font-mono text-[11px] text-command-muted">Gemini RAG active</span>
-            </div>
-            <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
-              <div
-                className="h-full rounded-full bg-gradient-to-r from-command-accent via-emerald-400 to-sky-400 transition-all duration-500"
-                style={{ width: `${Math.min(95, (loadingStep + 1) * 32)}%` }}
-              />
-            </div>
+          <div className="mt-4 flex items-center gap-2 px-1 text-xs text-command-muted animate-in fade-in">
+            <Loader2 className="h-3.5 w-3.5 animate-spin text-command-accent" />
+            <span className="font-medium text-command-soft">Analyzing operational debriefs...</span>
           </div>
         )}
 

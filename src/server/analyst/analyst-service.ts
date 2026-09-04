@@ -31,8 +31,20 @@ function cleanAnalystText(text: string): string {
 }
 
 const GREETING_WORDS = new Set([
-  "hi", "hello", "hey", "good", "morning", "afternoon", "evening", "there", "what", "tell", "about", "me", "the", "are", "you", "who", "can", "how", "please", "some", "with"
+  "hi", "hu", "hello", "hey", "hola", "yo", "sup", "howdy", "good", "morning", "afternoon", "evening", "there", "what", "tell", "about", "me", "the", "are", "you", "who", "can", "how", "please", "some", "with", "help", "test"
 ]);
+
+function isGreetingOrUnclear(question: string, terms: string[]): boolean {
+  const q = question.toLowerCase().trim();
+  const greetings = [
+    "hi", "hu", "hello", "hey", "hola", "yo", "sup", "howdy", "help",
+    "who are you", "what can you do", "what do you do", "how does this work",
+    "good morning", "good afternoon", "good evening", "greetings"
+  ];
+  if (greetings.includes(q) || q.length <= 3) return true;
+  if (greetings.some((g) => q.startsWith(g) && q.length < g.length + 6)) return true;
+  return terms.length === 0;
+}
 
 function excerptFor(transcript: string, terms: string[]): string {
   const text = transcript.trim();
@@ -92,6 +104,25 @@ function heuristicAnswer(question: string, observations: Observation[]): Analyst
   const q = question.toLowerCase();
   const evidence = evidenceFor(observations, terms);
 
+  if (isGreetingOrUnclear(question, terms)) {
+    return {
+      answer:
+        "Hello! I am Utah City's Senior Intelligence Analyst for 120 & 220 Bend.\n\n" +
+        "I analyze resident tour debriefs, objections, and leasing signals. To get started, you can ask me questions like:\n" +
+        "• Why are tours not converting?\n" +
+        "• Which amenities do residents praise or complain about?\n" +
+        "• Summarize objections regarding parking, noise, or pricing.",
+      confidence: "high",
+      sampleSize: observations.length,
+      evidence: [],
+      suggestedActions: [
+        "Why are tours not converting?",
+        "Which amenities matter most right now?",
+        "Summarize objections about parking.",
+      ],
+    };
+  }
+
   let answer: string;
   if (q.includes("parking") || q.includes("objection")) {
     const parking = digest.topObjections.find((item) => item.type === "parking");
@@ -109,7 +140,14 @@ function heuristicAnswer(question: string, observations: Observation[]): Analyst
   } else if (q.includes("sentiment")) {
     answer = `Average sentiment is ${digest.avgSentiment ?? "not available"} on the -2 to +2 scale across ${digest.totalTours} observation${digest.totalTours === 1 ? "" : "s"}. ${guardrail.confidenceLanguage}`;
   } else {
-    answer = `The current corpus contains ${digest.totalTours} observation${digest.totalTours === 1 ? "" : "s"}, ${digest.intentFunnel.hot} hot lead${digest.intentFunnel.hot === 1 ? "" : "s"}, and ${digest.topObjections[0]?.label ?? "no recurring objection"} as the leading objection signal. ${guardrail.confidenceLanguage}`;
+    const topObj = digest.topObjections[0]?.label ?? "None";
+    const topAmenity = digest.amenityRanking[0]?.label ?? "General amenities";
+    answer =
+      `Executive Operational Brief (${observations.length} debriefs across 120 & 220 Bend):\n` +
+      `• Primary Objection Signal: ${topObj} (${digest.topObjections[0]?.count ?? 0} mentions)\n` +
+      `• Top Amenity Driver: ${topAmenity} (${digest.amenityRanking[0]?.mentions ?? 0} mentions)\n` +
+      `• Lead Pipeline: ${digest.intentFunnel.hot} hot leads identified with ${digest.avgSentiment ?? "positive"} average sentiment.\n\n` +
+      `Ask a specific operational question (e.g., parking, amenities, or conversion barriers) for targeted resident quotes.`;
   }
 
   return {
@@ -118,9 +156,9 @@ function heuristicAnswer(question: string, observations: Observation[]): Analyst
     sampleSize: observations.length,
     evidence,
     suggestedActions: [
-      "Inspect supporting transcripts before changing policy.",
-      "Increase live capture volume before calling this a trend.",
-      "Promote repeated questions into host talk tracks when evidence count rises.",
+      "Why are tours not converting?",
+      "Which amenities matter most right now?",
+      "Summarize objections about parking.",
     ],
   };
 }
@@ -192,7 +230,7 @@ Rules:
 1. Be fast, direct, and concise. Keep responses under 130-160 words with quick, readable bullet points using '• '. Avoid filler or long essays.
 2. DO NOT use markdown asterisks (**) anywhere. Do NOT wrap names or titles in asterisks. Write clean, natural plain text.
 3. Cite resident names directly in plain text (e.g., Spencer Nelson flagged..., Zjanya Arwood noted...).
-4. If the user ONLY sends a greeting with no topic (e.g. just "hi" or "hello"), reply in 2 friendly sentences explaining what you analyze and suggest 2 topics to ask about. If they ask about a topic (such as amenities, parking, or safety), directly answer their question with debrief findings.
+4. If the user sends a greeting, typo, or brief/unclear input (e.g., "hi", "hu", "hello", "hey", "help"), reply warmly in 2-3 short sentences: introduce yourself as Utah City's Senior Intelligence Analyst for 120 & 220 Bend, explain what you analyze, and give clear instructions on what to ask (e.g., asking why tours aren't converting, how residents feel about amenities, or recurring objections like parking). Do not dump raw metrics.
 5. If a topic is not in the records (e.g., parking), state directly in 1-2 sentences that no residents have mentioned concerns about that topic across the 16 recorded debriefs.`,
         prompt: contextCacheName ? `Question: ${question}` : JSON.stringify(payload, null, 2),
         ...(contextCacheName
@@ -207,7 +245,7 @@ Rules:
       });
 
       const timeoutPromise = new Promise<{ text: string }>((_, reject) =>
-        setTimeout(() => reject(new Error("Model response timeout")), 3500)
+        setTimeout(() => reject(new Error("Model response timeout")), 6000)
       );
 
       const { text } = await Promise.race([fetchPromise, timeoutPromise]);
