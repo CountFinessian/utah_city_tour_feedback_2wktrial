@@ -4,6 +4,7 @@ import type { Observation } from "@/domain/observation";
 import { GOOGLE_MODELS, getGoogleModel, hasGoogleKey, hasLLM, llmModel } from "@/server/ai/model-config";
 import { listObservations } from "@/server/repositories/observations";
 import { buildDigest, buildNarrativeGuardrail } from "@/server/reporting/digest";
+import { getOrSetContextCache } from "@/server/ai/context-cache";
 import type { EvidenceItem } from "@/components/domain/EvidencePopover";
 
 export const AnalystRequestSchema = z.object({
@@ -112,15 +113,33 @@ function heuristicAnswer(question: string, observations: Observation[]): Analyst
   };
 }
 
+type CachedResult = {
+  fingerprint: string;
+  response: AnalystResponse;
+  timestamp: number;
+};
+const queryCache = new Map<string, CachedResult>();
+
 export async function answerAnalystQuestion(question: string): Promise<AnalystResponse> {
   const observations = await listObservations();
   const fallback = heuristicAnswer(question, observations);
   if (!hasLLM() || observations.length === 0) return fallback;
 
+  // 1. Check in-memory 0ms query cache
+  const normalized = question.trim().toLowerCase();
+  const fingerprint = `${observations.length}:${observations[0]?.createdAt ?? ""}`;
+  const cached = queryCache.get(normalized);
+  if (cached && cached.fingerprint === fingerprint && Date.now() - cached.timestamp < 15 * 60 * 1000) {
+    return cached.response;
+  }
+
   const digest = buildDigest(observations);
   const terms = keywordTerms(question);
   const matchedEvidence = evidenceFor(observations, terms);
   const evidence = matchedEvidence.length > 0 ? matchedEvidence : evidenceFor(observations, []);
+
+  // 2. Obtain or create Google Gemini Context Cache (~90% cheaper token billing)
+  const contextCacheName = await getOrSetContextCache(observations, digest);
 
   // Pass rich observation context so Gemini can cite real resident names and debriefs
   const observationsContext = observations.map((o) => ({
@@ -164,19 +183,37 @@ Rules:
 3. Cite resident names directly when sharing feedback (e.g., "**Spencer Nelson** flagged...", "**Zjanya Arwood** noted...").
 4. If the user ONLY sends a greeting with no topic (e.g. just "hi" or "hello"), reply in 2 friendly sentences explaining what you analyze and suggest 2 topics to ask about. If they ask about a topic (such as amenities, parking, or safety), directly answer their question with debrief findings.
 5. If a topic is not in the records (e.g., parking), state directly in 1-2 sentences that no residents have mentioned concerns about that topic across the 16 recorded debriefs.`,
-        prompt: JSON.stringify(payload, null, 2),
+        prompt: contextCacheName ? `Question: ${question}` : JSON.stringify(payload, null, 2),
+        ...(contextCacheName
+          ? {
+              providerOptions: {
+                google: {
+                  cachedContent: contextCacheName,
+                },
+              },
+            }
+          : {}),
       });
 
       const timeoutPromise = new Promise<{ text: string }>((_, reject) =>
-        setTimeout(() => reject(new Error("Model response timeout")), 3000)
+        setTimeout(() => reject(new Error("Model response timeout")), 3500)
       );
 
       const { text } = await Promise.race([fetchPromise, timeoutPromise]);
-      return {
+      const finalResponse: AnalystResponse = {
         ...fallback,
         answer: cleanAnalystText(text),
         evidence,
       };
+
+      // Store in 0ms query cache
+      queryCache.set(normalized, {
+        fingerprint,
+        response: finalResponse,
+        timestamp: Date.now(),
+      });
+
+      return finalResponse;
     } catch (err) {
       lastError = err;
       console.warn("[analyst] Model failed or timed out, trying next fallback model...", err instanceof Error ? err.message : err);
