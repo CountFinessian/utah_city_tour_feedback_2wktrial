@@ -337,7 +337,7 @@ function CaptureScreen({
   return (
     <div className="space-y-4 pb-24">
       <section className="mobile-card mobile-voice-card">
-        <Recorder serverAsr={serverAsr} onText={onText} />
+        <Recorder variant="card" serverAsr={serverAsr} onText={onText} />
       </section>
 
       <section className="mobile-card">

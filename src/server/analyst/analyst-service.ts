@@ -48,8 +48,25 @@ const STOP_WORDS = new Set([
   "resident", "residents", "prospect", "prospects", "tour", "tours", "visitor", "visitors",
   "corpus", "data", "lead", "leads", "feedback", "debrief", "debriefs", "record", "records",
   "please", "give", "show", "find", "look", "search", "check",
-  "hi", "hu", "hello", "hey", "good", "morning", "afternoon", "evening", "help", "test"
+  "hi", "hu", "hello", "hey", "good", "morning", "afternoon", "evening", "help", "test",
+  "peiple", "peple", "ppl", "folks", "guy", "guys"
 ]);
+
+const TOPIC_SYNONYMS: Record<string, string[]> = {
+  bike: ["bikes", "ebike", "ebikes", "e-bike", "e-bikes", "peloton", "cycling", "biking"],
+  bikes: ["bike", "ebike", "ebikes", "e-bike", "e-bikes", "peloton", "cycling", "biking"],
+  cycling: ["bike", "bikes", "peloton", "ebike"],
+  peloton: ["bike", "bikes", "cycling", "fitness", "gym"],
+  gym: ["fitness", "workout", "weights", "peloton"],
+  fitness: ["gym", "workout", "weights", "peloton"],
+  dog: ["dogs", "pet", "pets", "puppy", "puppies"],
+  dogs: ["dog", "pet", "pets", "puppy", "puppies"],
+  pet: ["pets", "dog", "dogs", "puppy", "puppies"],
+  pets: ["pet", "dog", "dogs", "puppy", "puppies"],
+  park: ["parks", "greenline", "grass"],
+  parking: ["car", "cars", "garage", "spots"],
+  pool: ["swim", "swimming"],
+};
 
 function isGreetingOrUnclear(question: string, terms: string[]): boolean {
   const q = question.toLowerCase().trim();
@@ -107,6 +124,8 @@ function evidenceFor(observations: Observation[], terms: string[]): EvidenceItem
   return observations
     .filter((observation) => {
       const haystack = [
+        observation.prospectTag,
+        observation.hostName,
         observation.transcript,
         observation.extraction.summary,
         ...observation.extraction.questionsAsked,
@@ -117,22 +136,75 @@ function evidenceFor(observations: Observation[], terms: string[]): EvidenceItem
         .toLowerCase();
       return normalizedTerms.some((term) => matchesTerm(haystack, term));
     })
-    .slice(0, 5)
-    .map((observation) => ({
-      id: observation.id,
-      label: observation.extraction.summary || "Observation",
-      excerpt: excerptFor(observation.transcript, normalizedTerms),
-      meta: [observation.hostName, observation.floorPlan, observation.source].filter(Boolean).join(" · "),
-    }));
+    .slice(0, 8)
+    .map((observation) => {
+      const residentName = observation.prospectTag
+        ? observation.prospectTag.replace(/\s*\([^)]*\)/, "").trim()
+        : observation.hostName;
+      return {
+        id: observation.id,
+        label: observation.extraction.summary || "Observation",
+        excerpt: excerptFor(observation.transcript, normalizedTerms),
+        meta: [residentName, observation.floorPlan, observation.source].filter(Boolean).join(" · "),
+      };
+    });
+}
+
+function reconcileEvidenceWithAnswer(
+  answerText: string,
+  initialEvidence: EvidenceItem[],
+  observations: Observation[],
+  terms: string[]
+): EvidenceItem[] {
+  const evidenceMap = new Map<string, EvidenceItem>();
+  for (const item of initialEvidence) {
+    evidenceMap.set(item.id, item);
+  }
+
+  const answerLower = answerText.toLowerCase();
+
+  for (const obs of observations) {
+    if (evidenceMap.has(obs.id)) continue;
+
+    const cleanName = (obs.prospectTag || "").replace(/\s*\([^)]*\)/, "").trim();
+    const nameMatch = cleanName.length >= 3 && answerLower.includes(cleanName.toLowerCase());
+
+    const transcriptLower = obs.transcript.toLowerCase();
+    const quotes = answerText.match(/"([^"]{8,})"/g) || [];
+    const quoteMatch = quotes.some((q) => {
+      const unquoted = q.replace(/^"|"$/g, "").toLowerCase().trim();
+      return transcriptLower.includes(unquoted);
+    });
+
+    if (nameMatch || quoteMatch) {
+      evidenceMap.set(obs.id, {
+        id: obs.id,
+        label: obs.extraction.summary || "Observation",
+        excerpt: excerptFor(obs.transcript, terms.length > 0 ? terms : [cleanName.toLowerCase()]),
+        meta: [cleanName || obs.hostName, obs.floorPlan, obs.source].filter(Boolean).join(" · "),
+      });
+    }
+  }
+
+  return Array.from(evidenceMap.values());
 }
 
 function keywordTerms(question: string): string[] {
-  return question
+  const base = question
     .toLowerCase()
     .split(/[^a-z0-9]+/)
     .map((term) => term.trim())
     .filter((term) => term.length >= 3 && !STOP_WORDS.has(term))
     .slice(0, 10);
+
+  const set = new Set<string>(base);
+  for (const term of base) {
+    const syns = TOPIC_SYNONYMS[term];
+    if (syns) {
+      for (const s of syns) set.add(s);
+    }
+  }
+  return Array.from(set);
 }
 
 function heuristicAnswer(question: string, observations: Observation[]): AnalystResponse {
@@ -306,10 +378,17 @@ export async function answerAnalystQuestion(question: string): Promise<AnalystRe
         text = res.text;
       }
 
+      const reconciledEvidence = reconcileEvidenceWithAnswer(
+        text,
+        evidence,
+        observations,
+        terms
+      );
+
       const finalResponse: AnalystResponse = {
         ...fallback,
         answer: cleanAnalystText(text),
-        evidence,
+        evidence: reconciledEvidence,
       };
 
       // Store in 0ms query cache
