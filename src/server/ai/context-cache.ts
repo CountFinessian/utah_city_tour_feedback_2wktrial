@@ -79,7 +79,6 @@ export async function getOrSetContextCache(
         systemInstruction: {
           parts: [
             {
-              text: "You are Utah City's Senior Intelligence Analyst for 120 & 220 Bend. You provide fast, direct, grounded, and concise executive analysis based on resident tour debriefs. Cite exact names, direct quotes, and specific numbers in clean plain text with no asterisks.",
               text: ANALYST_SYSTEM_PROMPT,
             },
           ],

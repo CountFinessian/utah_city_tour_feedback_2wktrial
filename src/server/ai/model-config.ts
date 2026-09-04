@@ -58,5 +58,5 @@ export function llmLabel(): string | null {
 }
 
 export function hasASR(): boolean {
-  return Boolean(process.env.OPENAI_API_KEY);
+  return hasGoogleKey() || Boolean(process.env.OPENAI_API_KEY);
 }

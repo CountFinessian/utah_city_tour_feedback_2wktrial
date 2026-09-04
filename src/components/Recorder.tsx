@@ -1,21 +1,14 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { Loader2, Mic, Square } from "lucide-react";
 import { transcribeBlob, type WhisperProgress } from "@/lib/whisper-client";
-
-/**
- * One-tap voice capture. Records audio in the browser, then transcribes it:
- *   • If the server has Whisper configured (serverAsr), POST to /api/transcribe.
- *   • Otherwise transcribe ON-DEVICE with transformers.js (Whisper) — no key, no
- *     server, fully private. The model downloads once (progress shown) and is cached.
- * Typing always works as a fallback; capture never blocks.
- */
 
 type Phase = "idle" | "recording" | "loading" | "transcribing";
 
 export function Recorder({
   onText,
-  serverAsr = false,
+  serverAsr = true,
 }: {
   onText: (text: string) => void;
   serverAsr?: boolean;
@@ -84,14 +77,13 @@ export function Recorder({
           setPhase("idle");
           return;
         }
-        // Server said unavailable → fall through to on-device.
         if (!json.unavailable) {
-          setNote(json.error || "Couldn't transcribe. Type below.");
+          setNote(json.error || "Couldn't transcribe audio. Type below.");
           setPhase("idle");
           return;
         }
-      } catch {
-        // network issue → fall through to on-device
+      } catch (err) {
+        console.warn("[recorder] Server transcribe error, falling back to on-device:", err);
       }
     }
     await transcribeOnDevice(blob);
@@ -111,10 +103,10 @@ export function Recorder({
         }
       });
       if (text) onText(text);
-      else setNote("Didn't catch any speech — try again, or type below.");
+      else setNote("Didn't catch any speech — try again or type below.");
     } catch (err) {
       console.error("[whisper] on-device transcription failed:", err);
-      setNote("Couldn't run on-device transcription here. Type your debrief below.");
+      setNote("Voice transcription unavailable. Type your debrief below.");
     } finally {
       setPhase("idle");
       setDlPct(null);
@@ -125,66 +117,61 @@ export function Recorder({
   const busy = phase === "loading" || phase === "transcribing";
 
   return (
-    <div className="flex flex-col items-center gap-3">
-      <button
-        type="button"
-        onClick={phase === "recording" ? stop : start}
-        disabled={busy}
-        aria-label={phase === "recording" ? "Stop recording" : "Start recording"}
-        className={[
-          "relative grid h-24 w-24 place-items-center rounded-full border text-white transition",
-          "shadow-[0_16px_34px_rgba(15,23,42,0.18)]",
-          phase === "recording" ? "border-red-500 bg-red-600" : "border-accent bg-accent hover:bg-accent-strong",
-          busy ? "opacity-70" : "",
-        ].join(" ")}
-      >
-        {phase === "recording" && (
-          <span className="absolute inset-0 animate-ping rounded-full bg-red-600/40" />
-        )}
-        {busy ? (
-          <span className="h-6 w-6 animate-spin rounded-full border-2 border-white/40 border-t-white" />
-        ) : phase === "recording" ? (
-          <span className="h-6 w-6 rounded-sm bg-white" />
-        ) : (
-          <MicIcon />
-        )}
-      </button>
+    <div className="flex flex-col items-center gap-2 py-1">
+      {phase === "idle" && (
+        <button
+          type="button"
+          onClick={start}
+          disabled={busy}
+          className="group flex items-center gap-2.5 px-4 py-2 rounded-full border border-command-border bg-white/[0.03] hover:bg-white/[0.08] hover:border-command-accent/50 text-command-ink text-xs font-semibold transition shadow-sm"
+        >
+          <span className="grid h-6 w-6 place-items-center rounded-full bg-command-accent/15 text-command-accent group-hover:bg-command-accent group-hover:text-black transition">
+            <Mic className="h-3.5 w-3.5" />
+          </span>
+          <span>Record voice debrief</span>
+        </button>
+      )}
 
-      <div className="min-h-5 text-center text-sm font-medium text-muted">
-        {phase === "recording" ? (
-          <span className="font-mono tabular-nums text-red-700">Recording {mmss} - tap to stop</span>
-        ) : phase === "loading" ? (
-          <span>{dlPct !== null ? `Loading voice model… ${dlPct}%` : "Loading voice model…"}</span>
-        ) : phase === "transcribing" ? (
-          <span>Transcribing on device…</span>
-        ) : (
-          <span>Tap and talk — transcribed privately on your device</span>
-        )}
-      </div>
-
-      {phase === "loading" && dlPct !== null && (
-        <div className="progress-track w-56">
-          <div className="progress-fill transition-all" style={{ width: `${dlPct}%` }} />
+      {phase === "recording" && (
+        <div className="flex items-center gap-3 px-3.5 py-1.5 rounded-full border border-rose-500/40 bg-rose-500/10 text-xs text-rose-300 shadow-sm animate-in fade-in">
+          <span className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75" />
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500" />
+          </span>
+          <span className="font-mono text-xs font-semibold tabular-nums text-rose-200">{mmss}</span>
+          <div className="flex items-center gap-0.5 h-3">
+            <span className="w-0.5 h-2 bg-rose-400/80 rounded-full animate-pulse" />
+            <span className="w-0.5 h-3.5 bg-rose-400 rounded-full animate-pulse [animation-delay:150ms]" />
+            <span className="w-0.5 h-1.5 bg-rose-400/60 rounded-full animate-pulse [animation-delay:300ms]" />
+            <span className="w-0.5 h-3 bg-rose-400/90 rounded-full animate-pulse [animation-delay:75ms]" />
+          </div>
+          <button
+            type="button"
+            onClick={stop}
+            className="ml-1 flex items-center gap-1 px-2.5 py-1 rounded-full bg-rose-600 hover:bg-rose-500 text-white font-semibold text-[11px] transition shadow-sm"
+          >
+            <Square className="h-2.5 w-2.5 fill-current" />
+            <span>Finish</span>
+          </button>
         </div>
       )}
 
-      {note && <p className="max-w-md rounded-[8px] border border-amber-200 bg-amber-50 px-3 py-2 text-center text-sm text-amber-800">{note}</p>}
-      {phase === "idle" && !note && !serverAsr && (
-        <p className="max-w-md text-center text-xs leading-relaxed text-muted">
-          First recording downloads a small voice model (~once per device). No API key, no cloud.
+      {busy && (
+        <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-command-border bg-white/[0.02] text-xs text-command-muted animate-in fade-in">
+          <Loader2 className="h-3.5 w-3.5 animate-spin text-command-accent" />
+          <span className="font-medium text-command-soft">
+            {phase === "loading" && dlPct !== null
+              ? `Loading voice model… ${dlPct}%`
+              : "Transcribing audio..."}
+          </span>
+        </div>
+      )}
+
+      {note && (
+        <p className="max-w-md rounded-[8px] border border-amber-400/30 bg-amber-500/10 px-3 py-1.5 text-center text-xs text-amber-200">
+          {note}
         </p>
       )}
     </div>
-  );
-}
-
-function MicIcon() {
-  return (
-    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
-      <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-      <line x1="12" y1="19" x2="12" y2="23" />
-      <line x1="8" y1="23" x2="16" y2="23" />
-    </svg>
   );
 }

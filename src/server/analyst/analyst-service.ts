@@ -128,13 +128,6 @@ function heuristicAnswer(question: string, observations: Observation[]): Analyst
 
   if (isGreetingOrUnclear(question, terms)) {
     return {
-      answer:
-        "Hello! I am Utah City's Senior Intelligence Analyst for 120 & 220 Bend.\n\n" +
-        "I analyze resident tour debriefs, objections, and leasing signals. To get started, you can ask me questions like:\n" +
-        "• Why are tours not converting?\n" +
-        "• Which amenities do residents praise or complain about?\n" +
-        "• Summarize objections regarding parking, noise, or pricing.",
-      confidence: "high",
       answer: "There is insufficient evidence in the debrief records to answer this prompt.",
       confidence: "low",
       sampleSize: observations.length,
@@ -206,12 +199,6 @@ const queryCache = new Map<string, CachedResult>();
 export async function answerAnalystQuestion(question: string): Promise<AnalystResponse> {
   const observations = await listObservations();
   const fallback = heuristicAnswer(question, observations);
-
-  const terms = keywordTerms(question);
-  if (isGreetingOrUnclear(question, terms)) {
-    return fallback;
-  }
-
   if (!hasLLM() || observations.length === 0) return fallback;
 
   // 1. Check in-memory 0ms query cache
@@ -269,13 +256,6 @@ export async function answerAnalystQuestion(question: string): Promise<AnalystRe
             temperature: 0.1,
             maxRetries: 0,
             prompt: `User Question: ${question}\n\nAnswer directly from the debrief corpus. If asked "how many people", count the debriefs explicitly. Cite real resident names, quote their specific feedback, and write clean plain text with no asterisks.`,
-            prompt: `User Question: ${question}
-
-Instructions:
-1. Always wrap any quotes or excerpts from residents in quotation marks: "..."
-2. State exact counts of people who mentioned the topic, cite their names, and include their direct quotes in quotation marks.
-3. If the debrief records do not contain sufficient evidence to answer this prompt, reply ONLY: "There is insufficient evidence in the debrief records to answer this prompt."
-4. Do not act as a conversational chatbot. Do not dump general metric lists unless asked. Do not use asterisks anywhere.`,
             providerOptions: {
               google: {
                 cachedContent: contextCacheName,
@@ -301,16 +281,6 @@ Instructions:
           maxRetries: 0,
           system: ANALYST_SYSTEM_PROMPT,
           prompt: JSON.stringify(payload, null, 2),
-          prompt: `User Question: ${question}
-
-Corpus Payload:
-${JSON.stringify(payload, null, 2)}
-
-Instructions:
-1. Always wrap any quotes or excerpts from residents in quotation marks: "..."
-2. State exact counts of people who mentioned the topic, cite their names, and include their direct quotes in quotation marks.
-3. If the debrief records do not contain sufficient evidence to answer this prompt, reply ONLY: "There is insufficient evidence in the debrief records to answer this prompt."
-4. Do not act as a conversational chatbot. Do not dump general metric lists unless asked. Do not use asterisks anywhere.`,
         });
         const timeoutPromise = new Promise<{ text: string }>((_, reject) =>
           setTimeout(() => reject(new Error("Standard model response timeout")), 6000)
